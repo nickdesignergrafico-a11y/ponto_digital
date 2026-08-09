@@ -1,0 +1,39 @@
+name: Envio Automático de Notificações de Ponto
+
+on:
+  schedule:
+    # 05:50 Horário de Brasília (08:50 UTC)
+    - cron: '50 8 * * *'
+    
+    # 12:00 Horário de Brasília (15:00 UTC)
+    - cron: '0 15 * * *'
+    
+    # 13:00 Horário de Brasília (16:00 UTC)
+    - cron: '0 16 * * *'
+    
+    # 17:50 Horário de Brasília (20:50 UTC)
+    - cron: '50 20 * * *'
+
+  workflow_dispatch: # Mantém o botão para testes manuais
+
+jobs:
+  enviar-alertas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar o ambiente Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências do Firebase
+        run: npm install firebase-admin
+
+      - name: Executar script de disparo
+        run: node enviar-notificacoes.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+
