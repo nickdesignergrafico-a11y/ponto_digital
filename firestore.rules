@@ -1,0 +1,23 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função auxiliar para verificar se o usuário está autenticado
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Coleção de usuários: leitura permitida para que a tela de login
+    // consiga consultar o CPF/E-mail do colaborador antes de autenticar.
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Demais coleções (ponto, solicitações, holerites, etc.): totalmente liberadas para usuários autenticados
+    match /{document=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

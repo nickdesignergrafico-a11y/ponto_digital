@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PontoDigital - Controle de Ponto & Holerites</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/pwa-icon.png" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="PontoDigital" />
+    <meta name="mobile-web-app-capable" content="yes" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      try {
+        const isIframe = window.self !== window.top;
+        if (!isIframe && 'serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            try {
+              navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Service Worker registered with scope: ', reg.scope))
+                .catch(err => console.warn('Service Worker registration failed: ', err));
+            } catch (innerErr) {
+              console.warn('Service Worker inner registration error: ', innerErr);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Service Worker registration blocked: ', err);
+      }
+    </script>
+  </body>
+</html>
+

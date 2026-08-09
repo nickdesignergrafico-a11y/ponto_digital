@@ -1,0 +1,254 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Employee or Administrator",
+      "type": "object",
+      "properties": {
+        "cpf": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "department": { "type": "string" },
+        "salary": { "type": "number" },
+        "benefits": { "type": "object" },
+        "password": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cpf", "name", "role", "password"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Time clock entry/exit record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["entry", "exit"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "signature": { "type": "string" },
+        "location": { "type": "object" }
+      }
+    },
+    "DailyAllowance": {
+      "title": "DailyAllowance",
+      "description": "Diária record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "date": { "type": "string", "format": "date" }
+      }
+    },
+    "Request": {
+      "title": "Request",
+      "description": "Leaves or allowances requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["vacation", "allowance"] },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      }
+    },
+    "SalarySlip": {
+      "title": "SalarySlip",
+      "description": "Monthly holerite",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "baseSalary": { "type": "number" },
+        "taxes": { "type": "array" },
+        "discounts": { "type": "array" },
+        "netSalary": { "type": "number" },
+        "signed": { "type": "boolean" },
+        "signature": { "type": "string" }
+      }
+    },
+    "BenefitReceipt": {
+      "title": "BenefitReceipt",
+      "description": "Meal/Benefit ticket receipt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userCpf": { "type": "string" },
+        "companyName": { "type": "string" },
+        "companyCnpj": { "type": "string" },
+        "amount": { "type": "number" },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "signed"] },
+        "signedAt": { "type": "string", "format": "date-time" },
+        "signatureText": { "type": "string" },
+        "signatureURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "companyName", "companyCnpj", "amount", "month", "year", "status", "createdAt"]
+    },
+    "CompanyConfig": {
+      "title": "CompanyConfig",
+      "description": "Global company settings",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "contact": { "type": "string" },
+        "logoUrl": { "type": "string" }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Gestão de pedidos",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User alert or notification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "type", "read", "createdAt"]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "A department channel or direct message thread",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["dm", "channel"] },
+        "name": { "type": "string" },
+        "participants": { "type": "array" },
+        "department": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "name", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A single text message inside a conversation thread",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhotoURL": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "senderId", "senderName", "timestamp"]
+    },
+    "TimecardSignature": {
+      "title": "TimecardSignature",
+      "description": "Employee timecard confirmation and HR approval/homologation signature details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "status": { "type": "string", "enum": ["default", "signed", "approved"] },
+        "signatureText": { "type": "string" },
+        "signatureDataUrl": { "type": "string" },
+        "signedAt": { "type": "string", "format": "date-time" },
+        "adminSigned": { "type": "boolean" },
+        "adminSignedAt": { "type": "string", "format": "date-time" },
+        "adminSignedUid": { "type": "string" }
+      }
+    },
+    "Occurrence": {
+      "title": "Occurrence",
+      "description": "Shift occurrence report submitted by employees or managed by admins",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["injury", "equipment", "maintenance", "behavior", "shift_handover", "general"] },
+        "date": { "type": "string", "format": "date" },
+        "shift": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "resolved"] },
+        "feedback": { "type": "string" },
+        "resolvedBy": { "type": "string" },
+        "resolvedByName": { "type": "string" },
+        "resolvedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "title", "description", "type", "date", "shift", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/occurrences/{occurrenceId}": {
+      "schema": "Occurrence",
+      "description": "Shift occurrences and records"
+    },
+    "/timecardSignatures/{signatureId}": {
+      "schema": "TimecardSignature",
+      "description": "Electronic signature records for general month timecards"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Main user records"
+    },
+    "/attendance/{recordId}": {
+      "schema": "Attendance",
+      "description": "Punch records"
+    },
+    "/diarias/{diariaId}": {
+      "schema": "DailyAllowance",
+      "description": "Daily allowance records"
+    },
+    "/requests/{requestId}": {
+      "schema": "Request",
+      "description": "Vacation and holiday requests"
+    },
+    "/salarySlips/{slipId}": {
+      "schema": "SalarySlip",
+      "description": "Monthly pay slips"
+    },
+    "/benefitReceipts/{receiptId}": {
+      "schema": "BenefitReceipt",
+      "description": "Meal/Benefit ticket receipts"
+    },
+    "/company/config": {
+      "schema": "CompanyConfig",
+      "description": "Single config document"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders management"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/chatRooms/{roomId}": {
+      "schema": "ChatRoom",
+      "description": "Internal discussion channels and private direct messages"
+    },
+    "/chatRooms/{roomId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chronological speech items inside a room container"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Dancing+Script:wght@600&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+}
+
+.signature-font {
+  font-family: 'Caveat', 'Dancing Script', 'Brush Script MT', cursive;
+}
+
+.glass-card {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+}
+
+.brutal-border {
+  @apply border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)];
+}
+
+/* Print Styles */
+@media print {
+  /* Hide the dashboard sidebar, top header, notifications button, action buttons, banners etc. */
+  header,
+  aside,
+  .no-print,
+  button,
+  .not-printable {
+    display: none !important;
+  }
+
+  /* Reset main layouts during printing */
+  html, body, #root, main, div, section {
+    background: white !important;
+    background-color: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+  }
+
+  /* Wrap-around structures */
+  .max-w-5xl, .max-w-6xl {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Target the A4 printable-sheet specifically */
+  .printable-sheet {
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 190mm !important;
+    height: auto !important;
+    min-height: 280mm !important;
+    padding: 0.6cm 1cm !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    page-break-inside: avoid !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure the sheet's table text and boundaries look pristine */
+  .printable-sheet table, 
+  .printable-sheet td, 
+  .printable-sheet th {
+    border-color: black !important;
+    color: black !important;
+  }
+
+  /* Keep exact signatures and text styling visible during print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

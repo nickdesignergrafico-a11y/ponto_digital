@@ -1,0 +1,47 @@
+{
+  "id": "/?source=pwa",
+  "name": "PontoDigital - Gestão & Controle de Ponto",
+  "short_name": "PontoDigital",
+  "description": "Sistema completo de registro de ponto eletrônico, livro ata, holerites digitais e controle operacional de equipes.",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/pwa-icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/?source=pwa",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Registrar Ponto",
+      "short_name": "Ponto",
+      "url": "/?source=pwa&action=punch",
+      "description": "Abrir tela de registro de ponto eletrônico"
+    }
+  ]
+}
