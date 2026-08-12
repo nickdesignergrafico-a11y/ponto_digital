@@ -29,7 +29,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
 
+    // Safety fallback timeout to ensure loading never gets stuck on true
+    const timer = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          console.warn("Auth initialization fallback timeout reached");
+          return false;
+        }
+        return prev;
+      });
+    }, 6000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(timer);
       // Clean up previous snapshot listener
       if (unsubscribeSnapshot) {
         unsubscribeSnapshot();
@@ -161,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearTimeout(timer);
       unsubscribeAuth();
       if (unsubscribeSnapshot) unsubscribeSnapshot();
     };
@@ -168,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user: overrideUser || user, loading, switchAdminUser }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

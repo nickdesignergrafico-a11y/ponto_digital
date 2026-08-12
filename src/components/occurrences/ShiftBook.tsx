@@ -178,8 +178,8 @@ export default function ShiftBook() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
+          const MAX_WIDTH = 600;
+          const MAX_HEIGHT = 600;
           let width = img.width;
           let height = img.height;
 
@@ -200,7 +200,7 @@ export default function ShiftBook() {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.5);
             resolve(compressedDataUrl);
           } else {
             resolve(event.target?.result as string);
@@ -334,20 +334,20 @@ export default function ShiftBook() {
     }
   }, [user, vigilanteSainte]);
 
-  // Reactive logic for switching armamento (equivalent to alternarArmamento in HTML)
-  useEffect(() => {
-    if (!hasWeapons) {
+  const handleToggleWeapons = (isArmed: boolean) => {
+    setHasWeapons(isArmed);
+    if (!isArmed) {
       setWeaponsTipo('Não se aplica');
       setWeaponsNumeroSerie('Não se aplica');
       setWeaponsQuantidadeMunicao('0');
       setColeteNumero('Não se aplica');
     } else {
-      setWeaponsTipo('Revólver .38');
-      setWeaponsNumeroSerie('');
-      setWeaponsQuantidadeMunicao('');
-      setColeteNumero('');
+      if (weaponsTipo === 'Não se aplica' || !weaponsTipo) setWeaponsTipo('Revólver .38');
+      if (weaponsNumeroSerie === 'Não se aplica') setWeaponsNumeroSerie('');
+      if (weaponsQuantidadeMunicao === '0' || weaponsQuantidadeMunicao === 0) setWeaponsQuantidadeMunicao('');
+      if (coleteNumero === 'Não se aplica') setColeteNumero('');
     }
-  }, [hasWeapons]);
+  };
 
   // Fetch all registered shift books
   useEffect(() => {
@@ -425,6 +425,23 @@ export default function ShiftBook() {
     const finalStatus = explicitStatus || targetStatus || 'in_progress';
     const isFinalizing = finalStatus === 'resolved';
 
+    let currentSainte = vigilanteSainte.trim();
+    if (!currentSainte) {
+      currentSainte = user.name || 'Vigilante';
+      setVigilanteSainte(currentSainte);
+    }
+
+    let currentEntrante = vigilanteEntrante.trim();
+    if (!currentEntrante) {
+      if (isFinalizing) {
+        currentEntrante = 'A definir / Sem vigilante entrante';
+        setVigilanteEntrante(currentEntrante);
+      } else {
+        alert("Por favor, insira o nome do Vigilante Entrante (Quem assume o posto).");
+        return;
+      }
+    }
+
     if (!postoName.trim()) {
       alert("Por favor, preencha o Nome do Posto / Cliente.");
       return;
@@ -435,14 +452,6 @@ export default function ShiftBook() {
     }
     if (!shift) {
       alert("Por favor, selecione o Horário do Turno.");
-      return;
-    }
-    if (!vigilanteSainte.trim()) {
-      alert("Por favor, insira o nome do Vigilante Sainte (Quem passa o posto).");
-      return;
-    }
-    if (!vigilanteEntrante.trim()) {
-      alert("Por favor, insira o nome do Vigilante Entrante (Quem assume o posto).");
       return;
     }
     if (!ocorrencias.trim()) {
@@ -457,19 +466,23 @@ export default function ShiftBook() {
       const shiftStartTime = shift === 'Manhã' ? '06:00' : '18:00';
       const shiftEndTime = shift === 'Manhã' ? '18:00' : '06:00';
 
+      const sainteName = currentSainte;
+      const entranteName = currentEntrante;
+      const currentUserName = user.name || 'Usuário';
+
       const compiledDescription = `ATA DE REGISTRO DO POSTO: ${postoName}
 DATA/HORA: ${date} (${diaSemana}) - Horário do Plantão: ${shiftStartTime} às ${shiftEndTime}
 STATUS DO TURNO: ${isFinalizing ? 'TURNO ENCERRADO / FINALIZADO' : 'TURNO EM ABERTO / EM ANDAMENTO'}
-VIGILANTE OPERADOR (SAINTE): ${vigilanteSainte}
-VIGILANTE ENTRANTE (ASSUMINDO): ${vigilanteEntrante}
+VIGILANTE OPERADOR (SAINTE): ${sainteName}
+VIGILANTE ENTRANTE (ASSUMINDO): ${entranteName}
 MODALIDADE DO POSTO: ${hasWeapons ? 'POSTO ARMADO' : 'POSTO DESARMADO'}
 
 --------------------------------------------------
 ARMAMENTO E CARGA DO POSTO:
-- Tipo de Arma: ${weaponsTipo}
-- Nº Série da Arma: ${weaponsNumeroSerie}
-- Quantidade de Munições: ${weaponsQuantidadeMunicao}
-- Nº Série do Colete Balístico: ${coleteNumero}
+- Tipo de Arma: ${weaponsTipo || 'Não se aplica'}
+- Nº Série da Arma: ${weaponsNumeroSerie || 'Não se aplica'}
+- Quantidade de Munições: ${weaponsQuantidadeMunicao || 0}
+- Nº Série do Colete Balístico: ${coleteNumero || 'Não se aplica'}
 
 --------------------------------------------------
 OCORRÊNCIAS E ROTINA:
@@ -477,93 +490,69 @@ ${ocorrencias}
 
 --------------------------------------------------
 PASSAGEM DE SERVIÇO:
-Ata devidamente registrada pelo Vigilante ${vigilanteSainte} e acompanhada por ${vigilanteEntrante}.
+Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entranteName}.
 - Status: ${isFinalizing ? 'Turno Concluído e Encerrado' : 'Turno Mantido em Aberto'}
 - Assinatura eletrônica registrada em sistema.`;
 
+      const cleanShiftBookDetails = {
+        postoName: postoName || '',
+        shiftStartTime: shiftStartTime || '06:00',
+        shiftEndTime: shiftEndTime || '18:00',
+        diaSemana: diaSemana || 'Dia de Plantão',
+        equipamentosReceived: editingRecord?.shiftBookDetails?.equipamentosReceived || [],
+        weaponsDetails: {
+          hasWeapons: Boolean(hasWeapons),
+          tipo: weaponsTipo || 'Não se aplica',
+          marca: hasWeapons ? (weaponsTipo === 'Pistola .380' ? 'Taurus' : 'CBC/Taurus') : 'Não se aplica',
+          numeroSerie: weaponsNumeroSerie || 'Não se aplica',
+          calibre: hasWeapons ? (weaponsTipo === 'Pistola .380' ? '.380' : '.38') : 'Não se aplica',
+          quantidadeMunicao: Number(weaponsQuantidadeMunicao) || 0
+        },
+        coleteNumero: coleteNumero || 'Não se aplica',
+        vendedorSaindoName: sainteName,
+        vendedorAssumindoName: entranteName,
+        signatureSaindo: sainteName || 'Assinado Eletronicamente',
+        signatureAssumindo: entranteName || 'Confirmado via Biometria/Login',
+        sigSainteDataUrl: sigSainteDataUrl || '',
+        sigEntranteDataUrl: sigEntranteDataUrl || '',
+        isIniciandoPlantao: true,
+        isFinalizandoPlantao: isFinalizing,
+        closedAt: isFinalizing ? serverTimestamp() : (editingRecord?.shiftBookDetails?.closedAt ?? null),
+        closedByName: isFinalizing ? currentUserName : (editingRecord?.shiftBookDetails?.closedByName ?? null),
+        routineDescription: ocorrencias || ''
+      };
+
       const newOccurrence = {
-        userId: user.uid,
-        userName: vigilanteSainte,
-        userRole: user.role,
-        title: `Livro de Ata de Plantão: Posto ${postoName} (${shift})`,
+        userId: user.uid || '',
+        userName: sainteName,
+        userRole: user.role || 'employee',
+        title: `Livro de Ata de Plantão: Posto ${postoName || 'Principal'} (${shift || 'Manhã'})`,
         type: 'shift_book' as const,
-        shift,
-        date,
+        shift: shift || 'Manhã',
+        date: date || new Date().toISOString().split('T')[0],
         description: compiledDescription,
         status: finalStatus,
         resolvedAt: isFinalizing ? serverTimestamp() : null,
-        resolvedByName: isFinalizing ? (user.name || 'Encerramento de Turno') : null,
+        resolvedByName: isFinalizing ? (currentUserName || 'Encerramento de Turno') : null,
         feedback: isFinalizing ? 'Ata encerrada eletronicamente.' : 'Turno em aberto.',
         createdAt: serverTimestamp(),
-        photos,
-        shiftBookDetails: {
-          postoName,
-          shiftStartTime,
-          shiftEndTime,
-          diaSemana,
-          equipamentosReceived: [],
-          weaponsDetails: {
-            hasWeapons,
-            tipo: weaponsTipo,
-            marca: hasWeapons ? (weaponsTipo === 'Pistola .380' ? 'Taurus' : 'CBC/Taurus') : 'Não se aplica',
-            numeroSerie: weaponsNumeroSerie,
-            calibre: hasWeapons ? (weaponsTipo === 'Pistola .380' ? '.380' : '.38') : 'Não se aplica',
-            quantidadeMunicao: Number(weaponsQuantidadeMunicao) || 0
-          },
-          coleteNumero,
-          vendedorSaindoName: vigilanteSainte,
-          vendedorAssumindoName: vigilanteEntrante,
-          signatureSaindo: vigilanteSainte || 'Assinado Eletronicamente',
-          signatureAssumindo: vigilanteEntrante || 'Confirmado via Biometria/Login',
-          sigSainteDataUrl,
-          sigEntranteDataUrl,
-          isIniciandoPlantao: true,
-          isFinalizandoPlantao: isFinalizing,
-          closedAt: isFinalizing ? serverTimestamp() : null,
-          closedByName: isFinalizing ? user.name : null,
-          routineDescription: ocorrencias
-        }
+        photos: photos || [],
+        shiftBookDetails: cleanShiftBookDetails
       };
 
       if (editingRecord) {
         const docRef = doc(db, 'occurrences', editingRecord.id);
         await updateDoc(docRef, {
-          title: `Livro de Ata de Plantão: Posto ${postoName} (${shift})`,
-          shift,
-          date,
+          title: `Livro de Ata de Plantão: Posto ${postoName || 'Principal'} (${shift || 'Manhã'})`,
+          shift: shift || 'Manhã',
+          date: date || new Date().toISOString().split('T')[0],
           description: compiledDescription,
-          userName: vigilanteSainte,
+          userName: sainteName,
           status: finalStatus,
-          resolvedAt: isFinalizing ? serverTimestamp() : editingRecord.resolvedAt || null,
-          resolvedByName: isFinalizing ? (user.name || 'Encerramento de Turno') : (editingRecord.resolvedByName || null),
-          photos,
-          shiftBookDetails: {
-            postoName,
-            shiftStartTime,
-            shiftEndTime,
-            diaSemana,
-            equipamentosReceived: editingRecord.shiftBookDetails?.equipamentosReceived || [],
-            weaponsDetails: {
-              hasWeapons,
-              tipo: weaponsTipo,
-              marca: hasWeapons ? (weaponsTipo === 'Pistola .380' ? 'Taurus' : 'CBC/Taurus') : 'Não se aplica',
-              numeroSerie: weaponsNumeroSerie,
-              calibre: hasWeapons ? (weaponsTipo === 'Pistola .380' ? '.380' : '.38') : 'Não se aplica',
-              quantidadeMunicao: Number(weaponsQuantidadeMunicao) || 0
-            },
-            coleteNumero,
-            vendedorSaindoName: vigilanteSainte,
-            vendedorAssumindoName: vigilanteEntrante,
-            signatureSaindo: vigilanteSainte || editingRecord.shiftBookDetails?.signatureSaindo || 'Assinado Eletronicamente',
-            signatureAssumindo: vigilanteEntrante || editingRecord.shiftBookDetails?.signatureAssumindo || 'Confirmado via Biometria/Login',
-            sigSainteDataUrl,
-            sigEntranteDataUrl,
-            isIniciandoPlantao: true,
-            isFinalizandoPlantao: isFinalizing,
-            closedAt: isFinalizing ? serverTimestamp() : editingRecord.shiftBookDetails?.closedAt || null,
-            closedByName: isFinalizing ? user.name : editingRecord.shiftBookDetails?.closedByName || null,
-            routineDescription: ocorrencias
-          }
+          resolvedAt: isFinalizing ? serverTimestamp() : (editingRecord.resolvedAt ?? null),
+          resolvedByName: isFinalizing ? (currentUserName || 'Encerramento de Turno') : (editingRecord.resolvedByName ?? null),
+          photos: photos || [],
+          shiftBookDetails: cleanShiftBookDetails
         });
 
         await createNotification(
@@ -591,7 +580,7 @@ Ata devidamente registrada pelo Vigilante ${vigilanteSainte} e acompanhada por $
             createNotification(
               adminDoc.id,
               isFinalizing ? "Ata de Turno Encerrada" : "Novo Turno Aberto",
-              `O colaborador ${vigilanteSainte} ${isFinalizing ? 'encerrou' : 'abriu'} o turno no posto ${postoName} (${shift})`,
+              `O colaborador ${sainteName} ${isFinalizing ? 'encerrou' : 'abriu'} o turno no posto ${postoName} (${shift})`,
               "info",
               "occurrences"
             );
@@ -608,9 +597,9 @@ Ata devidamente registrada pelo Vigilante ${vigilanteSainte} e acompanhada por $
       
       handleCloseForm();
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao salvar turno:", err);
-      alert("Houve um erro ao registrar a ata de turno. Tente novamente.");
+      alert(`Houve um erro ao registrar a ata de turno: ${err?.message || 'Verifique os dados e tente novamente.'}`);
     } finally {
       setSubmitting(false);
     }
@@ -904,7 +893,7 @@ Ata devidamente registrada pelo Vigilante ${vigilanteSainte} e acompanhada por $
                   <div className="grid grid-cols-2 gap-3 mt-1">
                     <button
                       type="button"
-                      onClick={() => setHasWeapons(true)}
+                      onClick={() => handleToggleWeapons(true)}
                       className={cn(
                         "py-3.5 px-4 text-center rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all border cursor-pointer",
                         hasWeapons 
@@ -916,7 +905,7 @@ Ata devidamente registrada pelo Vigilante ${vigilanteSainte} e acompanhada por $
                     </button>
                     <button
                       type="button"
-                      onClick={() => setHasWeapons(false)}
+                      onClick={() => handleToggleWeapons(false)}
                       className={cn(
                         "py-3.5 px-4 text-center rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all border cursor-pointer",
                         !hasWeapons 
