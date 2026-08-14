@@ -22,3 +22,42 @@ export const messaging = getMessaging(app);
 
 // Sua chave pública VAPID das notificações
 export const VAPID_KEY = "BCuavZLOVZ0klFre7PP0DicFs-rEOkm6Y0HyBVDQ0L4cJYnvCewgPHO0eVqHnG-Td0llQzaeAs8arvC4_Z_HrlI";
+
+import { doc, updateDoc } from 'firebase/firestore';
+import { getToken } from 'firebase/messaging';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+
+// Função definitiva para gerar o Token e salvar na coleção 'users'
+export async function inicializarNotificacoes(idUsuarioLogado: string) {
+  if (!idUsuarioLogado) return;
+
+  try {
+    const permissao = await Notification.requestPermission();
+    
+    if (permissao === 'granted') {
+      const tokenfcm = await getToken(messaging, { vapidKey: VAPID_KEY });
+      
+      if (tokenfcm) {
+        console.log('Endereço do dispositivo (Token FCM):', tokenfcm);
+        
+        // Atualiza direto na sua coleção correta 'users'
+        const usuarioRef = doc(db, 'users', idUsuarioLogado);
+        await updateDoc(usuarioRef, {
+          fcmToken: tokenfcm
+        });
+        console.log('fcmToken gravado com sucesso no perfil do usuário!');
+      }
+    }
+  } catch (erro) {
+    console.error('Erro ao configurar notificações push:', erro);
+  }
+}
+
+// O VIGIA SEGURO: Escuta o login uma única vez sem dar loop na tela branca
+const auth = getAuth();
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Roda a gravação em segundo plano sem travar o carregamento do React
+    inicializarNotificacoes(user.uid);
+  }
+});
