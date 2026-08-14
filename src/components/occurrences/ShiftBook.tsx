@@ -247,8 +247,8 @@ export default function ShiftBook() {
     setPostoName('');
     setSelectedPostId('');
     setShift('');
-    setVigilanteSainte(user?.name || '');
-    setVigilanteEntrante('');
+    setVigilanteEntrante(user?.name || '');
+    setVigilanteSainte('');
     setOcorrencias('');
     setSigSainteDataUrl('');
     setSigEntranteDataUrl('');
@@ -265,18 +265,18 @@ export default function ShiftBook() {
     const formattedDate = `${day}/${month}/${year}`;
     const formattedTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    const entName = vigilanteEntrante.trim() || '';
+    const entName = vigilanteEntrante.trim() || user?.name || '';
     const postName = postoName.trim() || '';
     const saiName = vigilanteSainte.trim() || '';
 
     if (type === 'iniciar') {
-      const text = `Eu vigia ${saiName || '____________________'} iniciando o plantão no posto ${postName || '_____________________'} no dia ${formattedDate} às ${formattedTime} e recebendo o posto do vigilante ${entName || '______________________________'}, sem qualquer alteração. Finalizo o relatório dessa ronda mediante imagens enviadas no grupo de whatsapp.`;
+      const text = `Eu vigia ${entName || '____________________'} iniciando o plantão no posto ${postName || '_____________________'} no dia ${formattedDate} às ${formattedTime} e recebendo o posto do vigilante ${saiName || '______________________________'}, sem qualquer alteração. Finalizo o relatório dessa ronda mediante imagens enviadas no grupo de whatsapp.`;
       setOcorrencias(text);
     } else if (type === 'finalizar') {
-      const text = `Eu vigia ${saiName || '________________'} finalizo o plantão no dia ${formattedDate} às ${formattedTime} Hrs sem alterações e passo o posto da ${postName || '__________________'} para o vigilante ${entName || '_____________________'}.`;
+      const text = `Eu vigia ${saiName || entName || '________________'} finalizo o plantão no dia ${formattedDate} às ${formattedTime} Hrs sem alterações e passo o posto da ${postName || '__________________'} para o vigilante ${entName && entName !== saiName ? entName : '_____________________'}.`;
       setOcorrencias(text);
     } else if (type === 'anexar_encerramento') {
-      const closingBlock = `\n\n--- ENCERRAMENTO DE TURNO (${formattedDate} às ${formattedTime}) ---\nEu vigia ${saiName || '________________'} encerro e finalizo a jornada do plantão no posto ${postName || '__________________'} às ${formattedTime} Hrs sem qualquer alteração pendente.`;
+      const closingBlock = `\n\n--- ENCERRAMENTO DE TURNO (${formattedDate} às ${formattedTime}) ---\nEu vigia ${saiName || entName || '________________'} encerro e finalizo a jornada do plantão no posto ${postName || '__________________'} às ${formattedTime} Hrs sem qualquer alteração pendente.`;
       setOcorrencias(prev => prev ? prev + closingBlock : closingBlock);
     }
   };
@@ -289,8 +289,8 @@ export default function ShiftBook() {
     setDate(rec.date);
     setShift(rec.shift as any || '');
     setHasWeapons(rec.shiftBookDetails?.weaponsDetails?.hasWeapons ?? false);
-    setVigilanteEntrante(rec.shiftBookDetails?.vendedorAssumindoName || '');
-    setVigilanteSainte(rec.shiftBookDetails?.vendedorSaindoName || rec.userName || '');
+    setVigilanteEntrante(rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || user?.name || '');
+    setVigilanteSainte(rec.shiftBookDetails?.vendedorSaindoName || '');
     setWeaponsTipo(rec.shiftBookDetails?.weaponsDetails?.tipo || 'Revólver .38');
     setWeaponsNumeroSerie(rec.shiftBookDetails?.weaponsDetails?.numeroSerie || '');
     setWeaponsQuantidadeMunicao(rec.shiftBookDetails?.weaponsDetails?.quantidadeMunicao ?? '');
@@ -310,8 +310,9 @@ export default function ShiftBook() {
     setDate(rec.date);
     setShift(rec.shift as any || '');
     setHasWeapons(rec.shiftBookDetails?.weaponsDetails?.hasWeapons ?? false);
-    setVigilanteEntrante(rec.shiftBookDetails?.vendedorAssumindoName || '');
-    setVigilanteSainte(rec.shiftBookDetails?.vendedorSaindoName || rec.userName || '');
+    const operatorOfShift = rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || user?.name || '';
+    setVigilanteSainte(operatorOfShift);
+    setVigilanteEntrante(rec.shiftBookDetails?.vendedorSaindoName && rec.shiftBookDetails.vendedorSaindoName !== operatorOfShift ? rec.shiftBookDetails.vendedorSaindoName : '');
     setWeaponsTipo(rec.shiftBookDetails?.weaponsDetails?.tipo || 'Revólver .38');
     setWeaponsNumeroSerie(rec.shiftBookDetails?.weaponsDetails?.numeroSerie || '');
     setWeaponsQuantidadeMunicao(rec.shiftBookDetails?.weaponsDetails?.quantidadeMunicao ?? '');
@@ -327,12 +328,12 @@ export default function ShiftBook() {
   // Submitting state
   const [submitting, setSubmitting] = useState(false);
 
-  // Prefill logged-in user name as leaving vigilante (Sainte)
+  // Prefill logged-in user name as entering vigilante (Entrante - quem assume o posto no início)
   useEffect(() => {
-    if (user && !vigilanteSainte) {
-      setVigilanteSainte(user.name);
+    if (user && !vigilanteEntrante && !editingRecord && !isClosingShiftMode) {
+      setVigilanteEntrante(user.name);
     }
-  }, [user, vigilanteSainte]);
+  }, [user, vigilanteEntrante, editingRecord, isClosingShiftMode]);
 
   const handleToggleWeapons = (isArmed: boolean) => {
     setHasWeapons(isArmed);
@@ -425,20 +426,25 @@ export default function ShiftBook() {
     const finalStatus = explicitStatus || targetStatus || 'in_progress';
     const isFinalizing = finalStatus === 'resolved';
 
-    let currentSainte = vigilanteSainte.trim();
-    if (!currentSainte) {
-      currentSainte = user.name || 'Vigilante';
-      setVigilanteSainte(currentSainte);
-    }
-
     let currentEntrante = vigilanteEntrante.trim();
     if (!currentEntrante) {
       if (isFinalizing) {
         currentEntrante = 'A definir / Sem vigilante entrante';
         setVigilanteEntrante(currentEntrante);
       } else {
-        alert("Por favor, insira o nome do Vigilante Entrante (Quem assume o posto).");
-        return;
+        currentEntrante = user.name || 'Vigilante';
+        setVigilanteEntrante(currentEntrante);
+      }
+    }
+
+    let currentSainte = vigilanteSainte.trim();
+    if (!currentSainte) {
+      if (isFinalizing) {
+        currentSainte = user.name || 'Vigilante';
+        setVigilanteSainte(currentSainte);
+      } else {
+        currentSainte = 'Plantão Anterior / Sem alteração';
+        setVigilanteSainte(currentSainte);
       }
     }
 
@@ -473,8 +479,8 @@ export default function ShiftBook() {
       const compiledDescription = `ATA DE REGISTRO DO POSTO: ${postoName}
 DATA/HORA: ${date} (${diaSemana}) - Horário do Plantão: ${shiftStartTime} às ${shiftEndTime}
 STATUS DO TURNO: ${isFinalizing ? 'TURNO ENCERRADO / FINALIZADO' : 'TURNO EM ABERTO / EM ANDAMENTO'}
-VIGILANTE OPERADOR (SAINTE): ${sainteName}
-VIGILANTE ENTRANTE (ASSUMINDO): ${entranteName}
+VIGILANTE ENTRANTE (ASSUMINDO O PLANTÃO): ${entranteName}
+VIGILANTE SAINTE (PASSANDO O POSTO): ${sainteName}
 MODALIDADE DO POSTO: ${hasWeapons ? 'POSTO ARMADO' : 'POSTO DESARMADO'}
 
 --------------------------------------------------
@@ -490,7 +496,7 @@ ${ocorrencias}
 
 --------------------------------------------------
 PASSAGEM DE SERVIÇO:
-Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entranteName}.
+Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sainteName}.
 - Status: ${isFinalizing ? 'Turno Concluído e Encerrado' : 'Turno Mantido em Aberto'}
 - Assinatura eletrônica registrada em sistema.`;
 
@@ -524,7 +530,7 @@ Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entr
 
       const newOccurrence = {
         userId: user.uid || '',
-        userName: sainteName,
+        userName: entranteName || user.name || 'Vigilante',
         userRole: user.role || 'employee',
         title: `Livro de Ata de Plantão: Posto ${postoName || 'Principal'} (${shift || 'Manhã'})`,
         type: 'shift_book' as const,
@@ -547,7 +553,7 @@ Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entr
           shift: shift || 'Manhã',
           date: date || new Date().toISOString().split('T')[0],
           description: compiledDescription,
-          userName: sainteName,
+          userName: entranteName || sainteName || user.name || 'Vigilante',
           status: finalStatus,
           resolvedAt: isFinalizing ? serverTimestamp() : (editingRecord.resolvedAt ?? null),
           resolvedByName: isFinalizing ? (currentUserName || 'Encerramento de Turno') : (editingRecord.resolvedByName ?? null),
@@ -925,8 +931,71 @@ Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entr
                   3. Operadores do Turno (Passagem de Posto)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Vigilante Entrante (Quem assume / está operando o turno) */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-slate-600">Vigilante Sainte (Quem passa o posto) *</label>
+                    <label className="text-xs font-bold text-indigo-950 flex items-center justify-between">
+                      <span>Vigilante Entrante (Quem assume / opera o plantão) *</span>
+                      <span className="text-[10px] text-indigo-700 font-extrabold bg-indigo-50 px-1.5 py-0.5 rounded">Plantão Atual</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3.5 w-4 h-4 text-indigo-500" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nome do Vigilante que assume o posto"
+                        value={vigilanteEntrante}
+                        onChange={(e) => setVigilanteEntrante(e.target.value)}
+                        className="w-full pl-10 pr-3.5 py-2.5 border border-indigo-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-indigo-50/20 font-bold text-slate-900"
+                      />
+                    </div>
+                    {selectedPostId && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {servicePosts.find(p => p.id === selectedPostId)?.vigilantes?.map((vig: string, i: number) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setVigilanteEntrante(vig)}
+                            className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                          >
+                            {vig} (Vig)
+                          </button>
+                        ))}
+                        {servicePosts.find(p => p.id === selectedPostId)?.colaboradores?.map((col: string, i: number) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setVigilanteEntrante(col)}
+                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                          >
+                            {col}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {registeredUsers.length > 0 && (
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) setVigilanteEntrante(e.target.value);
+                        }}
+                        value=""
+                        className="mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-slate-50 text-slate-700 font-medium"
+                      >
+                        <option value="">-- Selecionar Vigia / Vigilante Cadastrado --</option>
+                        {registeredUsers.map(u => (
+                          <option key={u.id} value={u.name}>
+                            {u.name} {u.postoName ? `(${u.postoName})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Vigilante Sainte (Quem entrega / passou o posto anterior) */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-600 flex items-center justify-between">
+                      <span>Vigilante Sainte (Quem passa / entregou o posto) *</span>
+                      <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">Plantão Anterior</span>
+                    </label>
                     <div className="relative">
                       <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                       <input
@@ -966,61 +1035,6 @@ Ata devidamente registrada pelo Vigilante ${sainteName} e acompanhada por ${entr
                       <select
                         onChange={(e) => {
                           if (e.target.value) setVigilanteSainte(e.target.value);
-                        }}
-                        value=""
-                        className="mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-slate-50 text-slate-700 font-medium"
-                      >
-                        <option value="">-- Selecionar Vigia / Vigilante Cadastrado --</option>
-                        {registeredUsers.map(u => (
-                          <option key={u.id} value={u.name}>
-                            {u.name} {u.postoName ? `(${u.postoName})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-slate-600">Vigilante Entrante (Quem assume o posto) *</label>
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        placeholder="Nome do Vigilante que assume o posto"
-                        value={vigilanteEntrante}
-                        onChange={(e) => setVigilanteEntrante(e.target.value)}
-                        className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50 font-medium text-slate-900"
-                      />
-                    </div>
-                    {selectedPostId && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {servicePosts.find(p => p.id === selectedPostId)?.vigilantes?.map((vig: string, i: number) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setVigilanteEntrante(vig)}
-                            className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
-                          >
-                            {vig} (Vig)
-                          </button>
-                        ))}
-                        {servicePosts.find(p => p.id === selectedPostId)?.colaboradores?.map((col: string, i: number) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setVigilanteEntrante(col)}
-                            className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
-                          >
-                            {col}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {registeredUsers.length > 0 && (
-                      <select
-                        onChange={(e) => {
-                          if (e.target.value) setVigilanteEntrante(e.target.value);
                         }}
                         value=""
                         className="mt-1 px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-slate-50 text-slate-700 font-medium"
