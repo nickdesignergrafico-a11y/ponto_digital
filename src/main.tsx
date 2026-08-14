@@ -8,26 +8,37 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
-import { messaging, VAPID_KEY } from './firebase';
+import { messaging, db, VAPID_KEY } from './firebase';
 import { getToken } from 'firebase/messaging';
+import { doc, updateDoc } from 'firebase/firestore';
 
-// Função automática para ativar as notificações push
-async function inicializarNotificacoes() {
+// Função automática para ativar as notificações push e salvar no banco
+async function inicializarNotificacoes(idUsuarioLogado: string) {
+  if (!idUsuarioLogado) return; // Só roda se o funcionário estiver logado
+
   try {
-    // 1. Pede permissão ao navegador do usuário
+    // 1. Pede permissão ao celular/navegador do usuário
     const permissao = await Notification.requestPermission();
     
     if (permissao === 'granted') {
       console.log('Permissão de notificação concedida!');
       
-      // 2. Registra o Service Worker e busca o Token exclusivo usando sua VAPID_KEY
+      // 2. Busca o Token exclusivo usando sua VAPID_KEY
       const tokenfcm = await getToken(messaging, { 
         vapidKey: VAPID_KEY 
       });
       
       if (tokenfcm) {
         console.log('Endereço do dispositivo (Token FCM):', tokenfcm);
-        // IMPORTANTE: Esse token que aparece no console é o que salva no cadastro do funcionário
+        
+        // 3. SALVA AUTOMATICAMENTE NO FIRESTORE DO COLABORADOR
+        // Procura o documento dele na coleção 'funcionarios' e atualiza o campo fcmToken
+        const funcionarioRef = doc(db, 'funcionarios', idUsuarioLogado);
+        await updateDoc(funcionarioRef, {
+          fcmToken: tokenfcm
+        });
+        
+        console.log('fcmToken gravado com sucesso no perfil do colaborador!');
       } else {
         console.log('Nenhum token gerado. Verifique o arquivo firebase-messaging-sw.js');
       }
@@ -39,6 +50,4 @@ async function inicializarNotificacoes() {
   }
 }
 
-// Executa a função assim que o sistema inicia
-inicializarNotificacoes();
 
