@@ -32,8 +32,8 @@ async function inicializarNotificacoes(idUsuarioLogado: string) {
         console.log('Endereço do dispositivo (Token FCM):', tokenfcm);
         
         // 3. SALVA AUTOMATICAMENTE NO FIRESTORE DO COLABORADOR
-        // Procura o documento dele na coleção 'funcionarios' e atualiza o campo fcmToken
-        const funcionarioRef = doc(db, 'funcionarios', idUsuarioLogado);
+        // Procura o documento dele na coleção 'users' e atualiza o campo fcmToken
+        const funcionarioRef = doc(db, 'users', idUsuarioLogado);
         await updateDoc(funcionarioRef, {
           fcmToken: tokenfcm
         });
