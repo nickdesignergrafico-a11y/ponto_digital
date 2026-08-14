@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getMessaging } from "firebase/messaging";
 
 // Credenciais oficiais do banco novo dos EUA
 const firebaseConfig = {
@@ -15,7 +14,5 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// Exporta apenas o banco de dados principal
 export const db = getFirestore(app);
-export const messaging = getMessaging(app);
-export const VAPID_KEY = "BCuavZLOVZ0klFre7PP0DicFs-rEOkm6Y0HyBVDQ0L4cJYnvCewgPHO0eVqHnG-Td0llQzaeAs8arvC4_Z_HrlI";
-
