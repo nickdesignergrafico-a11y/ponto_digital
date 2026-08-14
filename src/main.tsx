@@ -1,29 +1,23 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
 import { messaging, db, VAPID_KEY } from './firebase';
 import { getToken } from 'firebase/messaging';
 import { doc, updateDoc } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
-// Função automática para ativar as notificações push e salvar no banco
+// 1. Função automática para ativar as notificações push e salvar no banco 'users'
 async function inicializarNotificacoes(idUsuarioLogado: string) {
-  if (!idUsuarioLogado) return; // Só roda se o funcionário estiver logado
+  if (!idUsuarioLogado) return;
 
   try {
-    // 1. Pede permissão ao celular/navegador do usuário
     const permissao = await Notification.requestPermission();
     
     if (permissao === 'granted') {
       console.log('Permissão de notificação concedida!');
       
-      // 2. Busca o Token exclusivo usando sua VAPID_KEY
       const tokenfcm = await getToken(messaging, { 
         vapidKey: VAPID_KEY 
       });
@@ -31,14 +25,13 @@ async function inicializarNotificacoes(idUsuarioLogado: string) {
       if (tokenfcm) {
         console.log('Endereço do dispositivo (Token FCM):', tokenfcm);
         
-        // 3. SALVA AUTOMATICAMENTE NO FIRESTORE DO COLABORADOR
-        // Procura o documento dele na coleção 'users' e atualiza o campo fcmToken
-        const funcionarioRef = doc(db, 'users', idUsuarioLogado);
-        await updateDoc(funcionarioRef, {
+        // Salva direto na sua coleção correta 'users'
+        const usuarioRef = doc(db, 'users', idUsuarioLogado);
+        await updateDoc(usuarioRef, {
           fcmToken: tokenfcm
         });
         
-        console.log('fcmToken gravado com sucesso no perfil do colaborador!');
+        console.log('fcmToken gravado com sucesso no perfil do usuário!');
       } else {
         console.log('Nenhum token gerado. Verifique o arquivo firebase-messaging-sw.js');
       }
@@ -50,4 +43,18 @@ async function inicializarNotificacoes(idUsuarioLogado: string) {
   }
 }
 
+// 2. O PULO DO GATO: Espera o Firebase confirmar que o usuário fez login para rodar a função
+const auth = getAuth();
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    console.log('Usuário detectado no carregamento:', user.uid);
+    inicializarNotificacoes(user.uid); // Passa o ID do logado na hora certa!
+  }
+});
 
+// 3. Renderiza o site na tela normalmente
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
