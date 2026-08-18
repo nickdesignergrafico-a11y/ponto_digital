@@ -83,6 +83,19 @@ export default function ShiftBook() {
   const [vigilanteEntrante, setVigilanteEntrante] = useState('');
   const [vigilanteSainte, setVigilanteSainte] = useState('');
 
+  // Opening specific preserved fields
+  const [openedAtFormatted, setOpenedAtFormatted] = useState('');
+  const [relatoAbertura, setRelatoAbertura] = useState('');
+  const [sigAberturaDataUrl, setSigAberturaDataUrl] = useState('');
+  const [vendedorAssumindoAbertura, setVendedorAssumindoAbertura] = useState('');
+  const [vendedorPassandoAbertura, setVendedorPassandoAbertura] = useState('');
+
+  // Closing specific fields
+  const [closedAtFormatted, setClosedAtFormatted] = useState('');
+  const [relatoEncerramento, setRelatoEncerramento] = useState('');
+  const [vendedorPassandoFechamento, setVendedorPassandoFechamento] = useState('');
+  const [vendedorAssumindoFechamento, setVendedorAssumindoFechamento] = useState('');
+
   // Form States - Section 4: Controle de Armamento e Carga
   const [weaponsTipo, setWeaponsTipo] = useState('Revólver .38');
   const [weaponsNumeroSerie, setWeaponsNumeroSerie] = useState('');
@@ -254,6 +267,18 @@ export default function ShiftBook() {
     setSigEntranteDataUrl('');
     setHasWeapons(true);
     setPhotos([]);
+
+    // Reset opening & closing tracking fields
+    setOpenedAtFormatted('');
+    setRelatoAbertura('');
+    setSigAberturaDataUrl('');
+    setVendedorAssumindoAbertura('');
+    setVendedorPassandoAbertura('');
+    setClosedAtFormatted('');
+    setRelatoEncerramento('');
+    setVendedorPassandoFechamento('');
+    setVendedorAssumindoFechamento('');
+
     setShowForm(false);
   };
 
@@ -289,8 +314,24 @@ export default function ShiftBook() {
     setDate(rec.date);
     setShift(rec.shift as any || '');
     setHasWeapons(rec.shiftBookDetails?.weaponsDetails?.hasWeapons ?? false);
+    
+    // Primary shift operators
     setVigilanteEntrante(rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || user?.name || '');
     setVigilanteSainte(rec.shiftBookDetails?.vendedorSaindoName || '');
+
+    // Opening preserved fields
+    setOpenedAtFormatted(rec.shiftBookDetails?.openedAtFormatted || '');
+    setVendedorAssumindoAbertura(rec.shiftBookDetails?.vendedorAssumindoAbertura || rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || '');
+    setVendedorPassandoAbertura(rec.shiftBookDetails?.vendedorPassandoAbertura || rec.shiftBookDetails?.vendedorSaindoName || '');
+    setRelatoAbertura(rec.shiftBookDetails?.relatoAbertura || '');
+    setSigAberturaDataUrl(rec.shiftBookDetails?.sigAberturaDataUrl || '');
+
+    // Closing preserved fields
+    setClosedAtFormatted(rec.shiftBookDetails?.closedAtFormatted || '');
+    setVendedorPassandoFechamento(rec.shiftBookDetails?.vendedorPassandoFechamento || '');
+    setVendedorAssumindoFechamento(rec.shiftBookDetails?.vendedorAssumindoFechamento || '');
+    setRelatoEncerramento(rec.shiftBookDetails?.relatoEncerramento || '');
+
     setWeaponsTipo(rec.shiftBookDetails?.weaponsDetails?.tipo || 'Revólver .38');
     setWeaponsNumeroSerie(rec.shiftBookDetails?.weaponsDetails?.numeroSerie || '');
     setWeaponsQuantidadeMunicao(rec.shiftBookDetails?.weaponsDetails?.quantidadeMunicao ?? '');
@@ -310,17 +351,38 @@ export default function ShiftBook() {
     setDate(rec.date);
     setShift(rec.shift as any || '');
     setHasWeapons(rec.shiftBookDetails?.weaponsDetails?.hasWeapons ?? false);
-    const operatorOfShift = rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || user?.name || '';
+    
+    // The operator who worked the shift is now the one leaving/passing (Sainte)
+    const operatorOfShift = rec.shiftBookDetails?.vendedorAssumindoAbertura || rec.shiftBookDetails?.vendedorAssumindoName || rec.userName || user?.name || '';
     setVigilanteSainte(operatorOfShift);
-    setVigilanteEntrante(rec.shiftBookDetails?.vendedorSaindoName && rec.shiftBookDetails.vendedorSaindoName !== operatorOfShift ? rec.shiftBookDetails.vendedorSaindoName : '');
+    
+    // The incoming successor for the next shift (Entrante)
+    setVigilanteEntrante(rec.shiftBookDetails?.vendedorAssumindoFechamento || '');
+
+    // Preserve opening data so it is retained in the single record
+    const originalOpenedAt = rec.shiftBookDetails?.openedAtFormatted || `${formatarDataBR(rec.date)} (Abertura do Plantão)`;
+    const originalRelatoAbertura = rec.shiftBookDetails?.relatoAbertura || rec.shiftBookDetails?.routineDescription || rec.description || '';
+    const originalSigAbertura = rec.shiftBookDetails?.sigAberturaDataUrl || rec.shiftBookDetails?.sigEntranteDataUrl || '';
+    const originalPassandoAbertura = rec.shiftBookDetails?.vendedorPassandoAbertura || rec.shiftBookDetails?.vendedorSaindoName || '';
+
+    setOpenedAtFormatted(originalOpenedAt);
+    setVendedorAssumindoAbertura(operatorOfShift);
+    setVendedorPassandoAbertura(originalPassandoAbertura);
+    setRelatoAbertura(originalRelatoAbertura);
+    setSigAberturaDataUrl(originalSigAbertura);
+
+    // Weapons
     setWeaponsTipo(rec.shiftBookDetails?.weaponsDetails?.tipo || 'Revólver .38');
     setWeaponsNumeroSerie(rec.shiftBookDetails?.weaponsDetails?.numeroSerie || '');
     setWeaponsQuantidadeMunicao(rec.shiftBookDetails?.weaponsDetails?.quantidadeMunicao ?? '');
     setColeteNumero(rec.shiftBookDetails?.coleteNumero || '');
-    const existingText = rec.shiftBookDetails?.routineDescription || rec.description || '';
-    setOcorrencias(existingText);
-    setSigSainteDataUrl(rec.shiftBookDetails?.sigSainteDataUrl || '');
-    setSigEntranteDataUrl(rec.shiftBookDetails?.sigEntranteDataUrl || '');
+    
+    // Closing description: load existing closing if already typed, or start clean for closing narrative
+    const existingClosing = rec.shiftBookDetails?.relatoEncerramento || '';
+    setOcorrencias(existingClosing);
+    
+    setSigSainteDataUrl(rec.shiftBookDetails?.sigFechamentoSainteDataUrl || '');
+    setSigEntranteDataUrl(rec.shiftBookDetails?.sigFechamentoEntranteDataUrl || '');
     setPhotos(rec.photos || []);
     setShowForm(true);
   };
@@ -429,7 +491,7 @@ export default function ShiftBook() {
     let currentEntrante = vigilanteEntrante.trim();
     if (!currentEntrante) {
       if (isFinalizing) {
-        currentEntrante = 'A definir / Sem vigilante entrante';
+        currentEntrante = 'A definir / Próximo Plantão';
         setVigilanteEntrante(currentEntrante);
       } else {
         currentEntrante = user.name || 'Vigilante';
@@ -461,7 +523,10 @@ export default function ShiftBook() {
       return;
     }
     if (!ocorrencias.trim()) {
-      alert("Por favor, relate as ocorrências e novidades do turno.");
+      alert(isClosingShiftMode 
+        ? "Por favor, relate as informações do encerramento do turno."
+        : "Por favor, relate as ocorrências e novidades do início do turno."
+      );
       return;
     }
 
@@ -475,30 +540,85 @@ export default function ShiftBook() {
       const sainteName = currentSainte;
       const entranteName = currentEntrante;
       const currentUserName = user.name || 'Usuário';
+      const existingDetails = editingRecord?.shiftBookDetails || {};
+
+      // Determine Opening Information
+      const finalOpenedAtFormatted = isClosingShiftMode 
+        ? (existingDetails.openedAtFormatted || openedAtFormatted || `${formatarDataBR(date)} (Abertura)`)
+        : (openedAtFormatted || `${formatarDataBR(date)} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+      
+      const finalVendedorAssumindoAbertura = isClosingShiftMode
+        ? (existingDetails.vendedorAssumindoAbertura || existingDetails.vendedorAssumindoName || vendedorAssumindoAbertura || editingRecord?.userName || user.name)
+        : (entranteName);
+      
+      const finalVendedorPassandoAbertura = isClosingShiftMode
+        ? (existingDetails.vendedorPassandoAbertura || existingDetails.vendedorSaindoName || vendedorPassandoAbertura || 'Plantão Anterior')
+        : (sainteName);
+
+      const finalRelatoAbertura = isClosingShiftMode
+        ? (existingDetails.relatoAbertura || relatoAbertura || existingDetails.routineDescription || editingRecord?.description || ocorrencias)
+        : (ocorrencias);
+
+      const finalSigAbertura = isClosingShiftMode
+        ? (existingDetails.sigAberturaDataUrl || sigAberturaDataUrl || existingDetails.sigEntranteDataUrl || '')
+        : (sigEntranteDataUrl || '');
+
+      // Determine Closing Information
+      let finalClosedAtFormatted = existingDetails.closedAtFormatted || closedAtFormatted || '';
+      let finalVendedorPassandoFechamento = existingDetails.vendedorPassandoFechamento || '';
+      let finalVendedorAssumindoFechamento = existingDetails.vendedorAssumindoFechamento || '';
+      let finalRelatoEncerramento = existingDetails.relatoEncerramento || '';
+      let finalSigFechamentoSainte = existingDetails.sigFechamentoSainteDataUrl || '';
+      let finalSigFechamentoEntrante = existingDetails.sigFechamentoEntranteDataUrl || '';
+
+      if (isFinalizing) {
+        finalClosedAtFormatted = `${formatarDataBR(date)} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        finalVendedorPassandoFechamento = sainteName;
+        finalVendedorAssumindoFechamento = entranteName;
+        finalRelatoEncerramento = isClosingShiftMode ? ocorrencias : (existingDetails.relatoEncerramento || ocorrencias);
+        finalSigFechamentoSainte = sigSainteDataUrl || existingDetails.sigFechamentoSainteDataUrl || '';
+        finalSigFechamentoEntrante = sigEntranteDataUrl || existingDetails.sigFechamentoEntranteDataUrl || '';
+      }
+
+      // Unify Routine Narrative for backwards compatibility and display
+      let combinedRoutine = '';
+      if (finalRelatoAbertura) {
+        combinedRoutine += `🟢 [INÍCIO DO TURNO - ABERTURA]:\n${finalRelatoAbertura}\n`;
+      }
+      if (isFinalizing && finalRelatoEncerramento && finalRelatoEncerramento !== finalRelatoAbertura) {
+        combinedRoutine += `\n🏁 [FIM DO TURNO - ENCERRAMENTO (${finalClosedAtFormatted})]:\n${finalRelatoEncerramento}`;
+      } else if (!combinedRoutine) {
+        combinedRoutine = ocorrencias;
+      }
 
       const compiledDescription = `ATA DE REGISTRO DO POSTO: ${postoName}
 DATA/HORA: ${date} (${diaSemana}) - Horário do Plantão: ${shiftStartTime} às ${shiftEndTime}
-STATUS DO TURNO: ${isFinalizing ? 'TURNO ENCERRADO / FINALIZADO' : 'TURNO EM ABERTO / EM ANDAMENTO'}
-VIGILANTE ENTRANTE (ASSUMINDO O PLANTÃO): ${entranteName}
-VIGILANTE SAINTE (PASSANDO O POSTO): ${sainteName}
-MODALIDADE DO POSTO: ${hasWeapons ? 'POSTO ARMADO' : 'POSTO DESARMADO'}
+STATUS DO TURNO: ${isFinalizing ? 'TURNO ENCERRADO E HOMOLOGADO' : 'TURNO EM ABERTO (EM ANDAMENTO)'}
 
---------------------------------------------------
-ARMAMENTO E CARGA DO POSTO:
+==================================================
+1. TERMO DE ABERTURA (INÍCIO DO PLANTÃO):
+- Registrado em: ${finalOpenedAtFormatted}
+- Vigilante que assumiu o posto: ${finalVendedorAssumindoAbertura}
+- Vigilante que passou o posto: ${finalVendedorPassandoAbertura}
+- Modalidade: ${hasWeapons ? 'Posto Armado' : 'Posto Desarmado'}
+- Relato de Abertura:
+${finalRelatoAbertura}
+
+==================================================
+2. MATERIAL BÉLICO E CARGA DO POSTO:
 - Tipo de Arma: ${weaponsTipo || 'Não se aplica'}
 - Nº Série da Arma: ${weaponsNumeroSerie || 'Não se aplica'}
 - Quantidade de Munições: ${weaponsQuantidadeMunicao || 0}
 - Nº Série do Colete Balístico: ${coleteNumero || 'Não se aplica'}
 
---------------------------------------------------
-OCORRÊNCIAS E ROTINA:
-${ocorrencias}
-
---------------------------------------------------
-PASSAGEM DE SERVIÇO:
-Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sainteName}.
-- Status: ${isFinalizing ? 'Turno Concluído e Encerrado' : 'Turno Mantido em Aberto'}
-- Assinatura eletrônica registrada em sistema.`;
+==================================================
+3. TERMO DE ENCERRAMENTO E PASSAGEM (FIM DO PLANTÃO):
+${isFinalizing ? `- Encerrado em: ${finalClosedAtFormatted}
+- Vigilante entregando o posto (Sainte): ${finalVendedorPassandoFechamento}
+- Vigilante sucessor recebendo o posto (Entrante): ${finalVendedorAssumindoFechamento}
+- Relato de Encerramento:
+${finalRelatoEncerramento}` : `[TURNO EM ANDAMENTO - Aguardando encerramento pelo operador]`}
+==================================================`;
 
       const cleanShiftBookDetails = {
         postoName: postoName || '',
@@ -515,22 +635,40 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
           quantidadeMunicao: Number(weaponsQuantidadeMunicao) || 0
         },
         coleteNumero: coleteNumero || 'Não se aplica',
-        vendedorSaindoName: sainteName,
-        vendedorAssumindoName: entranteName,
-        signatureSaindo: sainteName || 'Assinado Eletronicamente',
-        signatureAssumindo: entranteName || 'Confirmado via Biometria/Login',
-        sigSainteDataUrl: sigSainteDataUrl || '',
-        sigEntranteDataUrl: sigEntranteDataUrl || '',
+        
+        // General / Backwards compatible fields
+        vendedorSaindoName: isFinalizing ? finalVendedorPassandoFechamento : finalVendedorPassandoAbertura,
+        vendedorAssumindoName: isFinalizing ? finalVendedorAssumindoFechamento : finalVendedorAssumindoAbertura,
+        signatureSaindo: isFinalizing ? finalVendedorPassandoFechamento : finalVendedorPassandoAbertura,
+        signatureAssumindo: isFinalizing ? finalVendedorAssumindoFechamento : finalVendedorAssumindoAbertura,
+        sigSainteDataUrl: isFinalizing ? finalSigFechamentoSainte : sigSainteDataUrl,
+        sigEntranteDataUrl: isFinalizing ? finalSigFechamentoEntrante : (finalSigAbertura || sigEntranteDataUrl),
+
+        // Dedicated Opening Lifecycle Fields
+        openedAtFormatted: finalOpenedAtFormatted,
+        vendedorAssumindoAbertura: finalVendedorAssumindoAbertura,
+        vendedorPassandoAbertura: finalVendedorPassandoAbertura,
+        relatoAbertura: finalRelatoAbertura,
+        sigAberturaDataUrl: finalSigAbertura,
+
+        // Dedicated Closing Lifecycle Fields
+        closedAtFormatted: isFinalizing ? finalClosedAtFormatted : (existingDetails.closedAtFormatted || null),
+        vendedorPassandoFechamento: isFinalizing ? finalVendedorPassandoFechamento : (existingDetails.vendedorPassandoFechamento || null),
+        vendedorAssumindoFechamento: isFinalizing ? finalVendedorAssumindoFechamento : (existingDetails.vendedorAssumindoFechamento || null),
+        relatoEncerramento: isFinalizing ? finalRelatoEncerramento : (existingDetails.relatoEncerramento || null),
+        sigFechamentoSainteDataUrl: isFinalizing ? finalSigFechamentoSainte : (existingDetails.sigFechamentoSainteDataUrl || null),
+        sigFechamentoEntranteDataUrl: isFinalizing ? finalSigFechamentoEntrante : (existingDetails.sigFechamentoEntranteDataUrl || null),
+
         isIniciandoPlantao: true,
         isFinalizandoPlantao: isFinalizing,
-        closedAt: isFinalizing ? serverTimestamp() : (editingRecord?.shiftBookDetails?.closedAt ?? null),
-        closedByName: isFinalizing ? currentUserName : (editingRecord?.shiftBookDetails?.closedByName ?? null),
-        routineDescription: ocorrencias || ''
+        closedAt: isFinalizing ? serverTimestamp() : (existingDetails.closedAt ?? null),
+        closedByName: isFinalizing ? currentUserName : (existingDetails.closedByName ?? null),
+        routineDescription: combinedRoutine || ocorrencias || ''
       };
 
       const newOccurrence = {
         userId: user.uid || '',
-        userName: entranteName || user.name || 'Vigilante',
+        userName: finalVendedorAssumindoAbertura || user.name || 'Vigilante',
         userRole: user.role || 'employee',
         title: `Livro de Ata de Plantão: Posto ${postoName || 'Principal'} (${shift || 'Manhã'})`,
         type: 'shift_book' as const,
@@ -553,7 +691,7 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
           shift: shift || 'Manhã',
           date: date || new Date().toISOString().split('T')[0],
           description: compiledDescription,
-          userName: entranteName || sainteName || user.name || 'Vigilante',
+          userName: finalVendedorAssumindoAbertura || user.name || 'Vigilante',
           status: finalStatus,
           resolvedAt: isFinalizing ? serverTimestamp() : (editingRecord.resolvedAt ?? null),
           resolvedByName: isFinalizing ? (currentUserName || 'Encerramento de Turno') : (editingRecord.resolvedByName ?? null),
@@ -563,19 +701,22 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
 
         await createNotification(
           user.uid,
-          isFinalizing ? "Turno Encerrado" : "Ata de Turno Atualizada",
-          isFinalizing ? `Turno do posto ${postoName} foi ENCERRADO com sucesso!` : `Livro de ata do posto ${postoName} atualizado com sucesso!`,
+          isFinalizing ? "Turno Encerrado com Sucesso" : "Ata de Turno Atualizada",
+          isFinalizing ? `O turno do posto ${postoName} foi finalizado e salvo no mesmo livro com sucesso!` : `Livro de ata do posto ${postoName} atualizado com sucesso!`,
           "success"
         );
 
-        alert(isFinalizing ? "Sucesso! Turno ENCERRADO E FINALIZADO com sucesso." : "Sucesso! Registro de turno atualizado (mantido em aberto).");
+        alert(isFinalizing 
+          ? "Sucesso! Início e fim do plantão salvos no mesmo livro de turno com sucesso." 
+          : "Sucesso! Registro de turno atualizado e mantido em aberto."
+        );
       } else {
         await addDoc(collection(db, 'occurrences'), newOccurrence);
 
         await createNotification(
           user.uid,
           isFinalizing ? "Turno Registrado e Encerrado" : "Turno Aberto",
-          isFinalizing ? `Ata do posto ${postoName} registrada e finalizada.` : `Turno ABERTO no posto ${postoName}.`,
+          isFinalizing ? `Ata do posto ${postoName} registrada e finalizada.` : `Turno ABERTO no posto ${postoName}. Ao final do plantão, encerre este mesmo livro.`,
           "success"
         );
 
@@ -586,7 +727,7 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
             createNotification(
               adminDoc.id,
               isFinalizing ? "Ata de Turno Encerrada" : "Novo Turno Aberto",
-              `O colaborador ${sainteName} ${isFinalizing ? 'encerrou' : 'abriu'} o turno no posto ${postoName} (${shift})`,
+              `O colaborador ${finalVendedorAssumindoAbertura} ${isFinalizing ? 'encerrou' : 'abriu'} o turno no posto ${postoName} (${shift})`,
               "info",
               "occurrences"
             );
@@ -596,8 +737,8 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
         }
 
         alert(isFinalizing 
-          ? "Sucesso! Registro de turno finalizado com sucesso."
-          : "Sucesso! Novo turno ABERTO com sucesso! Ao final do seu plantão (ex: 17:50), abra este mesmo registro para encerrar seu turno."
+          ? "Sucesso! Registro de turno salvo e finalizado no livro de atas."
+          : "Sucesso! Turno ABERTO com sucesso! Ao final do seu plantão (ex: 17:50), clique em 'Encerrar Turno' neste mesmo livro para finalizar."
         );
       }
       
@@ -807,13 +948,44 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
             <form onSubmit={(e) => handleSaveTurno(e, targetStatus)} className="p-6 space-y-6">
               
               {isClosingShiftMode && (
-                <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl flex items-center gap-3 text-amber-950 mb-2 shadow-xs">
-                  <Clock className="w-5 h-5 text-amber-600 shrink-0" />
-                  <div>
-                    <strong className="block text-xs uppercase font-extrabold text-amber-950">Procedimento de Encerramento (ex: 17:50 / Término de Plantão)</strong>
-                    <p className="text-xs text-amber-800">
-                      Você está concluindo a jornada deste turno. Anexe fotos do encerramento (se houver), revise os dados de armamento, colha as assinaturas e clique no botão <strong>"ENCERRAR E FINALIZAR TURNO"</strong>.
-                    </p>
+                <div className="bg-amber-50/80 border border-amber-300 rounded-2xl p-4 sm:p-5 space-y-3 mb-2 shadow-xs">
+                  <div className="flex items-center gap-3 text-amber-950">
+                    <div className="p-2.5 bg-amber-200 text-amber-900 rounded-xl">
+                      <Clock className="w-5 h-5 shrink-0" />
+                    </div>
+                    <div>
+                      <strong className="block text-xs uppercase font-black text-amber-950">
+                        Encerramento de Plantão (Registro Único do Turno)
+                      </strong>
+                      <p className="text-xs text-amber-850 font-medium">
+                        Você está finalizando este plantão. As informações de início/abertura já estão gravadas abaixo e serão consolidadas com este encerramento no mesmo livro.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Opening summary snapshot */}
+                  <div className="bg-white/90 border border-amber-200 rounded-xl p-3.5 text-xs text-slate-800 space-y-1.5 shadow-xs">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block">
+                      📌 Dados Registrados na Abertura do Turno
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-500 font-semibold">Abertura: </span>
+                        <strong className="text-slate-900">{openedAtFormatted || 'Início do Plantão'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-semibold">Vigia que Assumiu: </span>
+                        <strong className="text-slate-900">{vendedorAssumindoAbertura || user?.name || 'Vigilante'}</strong>
+                      </div>
+                    </div>
+                    {relatoAbertura && (
+                      <div className="mt-2 pt-2 border-t border-amber-100">
+                        <span className="text-[10px] font-bold text-slate-500 block mb-0.5">Relato de Abertura Gravado:</span>
+                        <p className="text-[11px] font-mono text-slate-700 bg-amber-50/50 p-2 rounded-lg border border-amber-150 line-clamp-3">
+                          {relatoAbertura}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2038,21 +2210,61 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-3 text-xs py-1 border-y border-amber-900/10">
-                                <div className="py-1">
-                                  <span className="text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider">Vigilante Sainte</span>
-                                  <span className="font-extrabold text-slate-800 flex items-center gap-1 mt-1 truncate">
-                                    <User className="w-3.5 h-3.5 text-slate-400" />
-                                    {details?.vendedorSaindoName || currentRec.userName}
-                                  </span>
+                              {/* Left Page Operators / Lifecycle Info */}
+                              <div className="space-y-3">
+                                {/* 1. Abertura */}
+                                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3 text-xs">
+                                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-1 mb-1.5">
+                                    <span className="text-[9px] font-black uppercase text-emerald-900 flex items-center gap-1">
+                                      🟢 1. Abertura do Plantão
+                                    </span>
+                                    <span className="text-[9px] font-mono text-emerald-800 font-bold">
+                                      {details?.openedAtFormatted || `${formatarDataBR(currentRec.date)}`}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <span className="text-[8px] font-bold text-slate-500 uppercase block">Vigia que Assumiu</span>
+                                      <strong className="text-slate-900 block truncate text-[11px]">
+                                        {details?.vendedorAssumindoAbertura || details?.vendedorAssumindoName || currentRec.userName}
+                                      </strong>
+                                    </div>
+                                    <div>
+                                      <span className="text-[8px] font-bold text-slate-500 uppercase block">Passou no Início</span>
+                                      <strong className="text-slate-900 block truncate text-[11px]">
+                                        {details?.vendedorPassandoAbertura || details?.vendedorSaindoName || "Plantão Anterior"}
+                                      </strong>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="py-1 border-l border-amber-900/10 pl-3">
-                                  <span className="text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider">Vigilante Entrante</span>
-                                  <span className="font-extrabold text-slate-800 flex items-center gap-1 mt-1 truncate">
-                                    <User className="w-3.5 h-3.5 text-slate-400" />
-                                    {details?.vendedorAssumindoName || "-"}
-                                  </span>
-                                </div>
+
+                                {/* 2. Encerramento (se finalizado) */}
+                                {currentRec.status === 'resolved' && (
+                                  <div className="bg-indigo-50/60 border border-indigo-200/80 rounded-xl p-3 text-xs">
+                                    <div className="flex items-center justify-between border-b border-indigo-200/60 pb-1 mb-1.5">
+                                      <span className="text-[9px] font-black uppercase text-indigo-950 flex items-center gap-1">
+                                        🏁 2. Encerramento do Plantão
+                                      </span>
+                                      <span className="text-[9px] font-mono text-indigo-800 font-bold">
+                                        {details?.closedAtFormatted || 'Concluído'}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase block">Vigia Entregando</span>
+                                        <strong className="text-slate-900 block truncate text-[11px]">
+                                          {details?.vendedorPassandoFechamento || details?.vendedorSaindoName || details?.vendedorAssumindoAbertura || currentRec.userName}
+                                        </strong>
+                                      </div>
+                                      <div>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase block">Sucessor (Recebendo)</span>
+                                        <strong className="text-slate-900 block truncate text-[11px]">
+                                          {details?.vendedorAssumindoFechamento || details?.vendedorAssumindoName || "Próximo Plantão"}
+                                        </strong>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Material Bélico Details */}
@@ -2060,7 +2272,7 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1">
                                   <h4 className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                                     <Shield className="w-3.5 h-3.5 text-indigo-600" />
-                                    Custódia de Carga
+                                    Custódia de Carga & Armamento
                                   </h4>
                                   <span className={cn(
                                     "text-[8px] font-black uppercase px-2 py-0.5 rounded border-2",
@@ -2139,21 +2351,52 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                             <div className="space-y-4 md:pl-4">
                               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1">
                                 <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-                                Diário de Ocorrências & Rotina do Posto
+                                Diário do Livro de Atas (Abertura e Encerramento)
                               </h3>
 
                               {/* Ruled Notebook Paper for Narration */}
-                              <div className="relative rounded-xl border border-amber-900/10 p-4 bg-[#fbf9f4] shadow-inner overflow-hidden">
-                                <div 
-                                  className="text-xs sm:text-sm text-slate-800 whitespace-pre-line font-medium leading-[26px] min-h-[160px] max-h-[220px] overflow-y-auto pl-2 pr-1 select-text"
-                                  style={{
-                                    backgroundImage: 'linear-gradient(#eae1cf 1px, transparent 1px)',
-                                    backgroundSize: '100% 26px',
-                                    lineHeight: '26px'
-                                  }}
-                                >
-                                  {details?.routineDescription || currentRec.description || "Sem novidades ou ocorrências registradas neste turno de trabalho."}
+                              <div className="relative rounded-xl border border-amber-900/10 p-4 bg-[#fbf9f4] shadow-inner overflow-hidden space-y-3">
+                                {/* Relato de Abertura */}
+                                <div>
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-800 block mb-1">
+                                    🟢 Termo de Abertura (Início do Plantão):
+                                  </span>
+                                  <div 
+                                    className="text-xs sm:text-sm text-slate-800 whitespace-pre-line font-medium leading-[26px] max-h-[140px] overflow-y-auto pl-2 pr-1 select-text"
+                                    style={{
+                                      backgroundImage: 'linear-gradient(#eae1cf 1px, transparent 1px)',
+                                      backgroundSize: '100% 26px',
+                                      lineHeight: '26px'
+                                    }}
+                                  >
+                                    {details?.relatoAbertura || details?.routineDescription || currentRec.description || "Sem novidades ou ocorrências registradas no início do plantão."}
+                                  </div>
                                 </div>
+
+                                {/* Relato de Encerramento (se houver) */}
+                                {currentRec.status === 'resolved' ? (
+                                  <div className="pt-2 border-t border-amber-200">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-indigo-900 block mb-1">
+                                      🏁 Termo de Encerramento (Fim do Plantão):
+                                    </span>
+                                    <div 
+                                      className="text-xs sm:text-sm text-slate-800 whitespace-pre-line font-medium leading-[26px] max-h-[120px] overflow-y-auto pl-2 pr-1 select-text"
+                                      style={{
+                                        backgroundImage: 'linear-gradient(#eae1cf 1px, transparent 1px)',
+                                        backgroundSize: '100% 26px',
+                                        lineHeight: '26px'
+                                      }}
+                                    >
+                                      {details?.relatoEncerramento || "Turno finalizado e entregue sem alterações adicionais."}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-amber-50/70 border border-amber-200 p-2.5 rounded-lg text-center">
+                                    <span className="text-[10px] font-bold text-amber-900">
+                                      🟡 Turno em andamento. Ao finalizar o plantão, registre o encerramento neste mesmo livro.
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Polaroid Evidence Photos Gallery */}
@@ -2184,12 +2427,18 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                               {/* Formal Passagem/Vistos signatures */}
                               <div className="bg-[#fcfaf5] border border-amber-900/10 p-3 rounded-xl space-y-2 mt-2">
                                 <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block border-b pb-1">
-                                  🤝 Termo de Passagem de Serviço
+                                  🤝 Assinaturas Digitais do Livro de Atas
                                 </span>
                                 <div className="grid grid-cols-2 gap-2 text-center text-[10px]">
                                   <div className="p-1.5 bg-white rounded-lg border border-slate-100 flex flex-col items-center justify-center">
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Sainte (Passei)</span>
-                                    <strong className="text-slate-800 block truncate max-w-full font-bold mt-0.5">{details?.vendedorSaindoName || currentRec.userName}</strong>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase">
+                                      {currentRec.status === 'resolved' ? 'Vigia Entregando (Sainte)' : 'Passou no Início'}
+                                    </span>
+                                    <strong className="text-slate-800 block truncate max-w-full font-bold mt-0.5">
+                                      {currentRec.status === 'resolved' 
+                                        ? (details?.vendedorPassandoFechamento || details?.vendedorSaindoName || details?.vendedorAssumindoAbertura || currentRec.userName)
+                                        : (details?.vendedorPassandoAbertura || details?.vendedorSaindoName || 'Plantão Anterior')}
+                                    </strong>
                                     {details?.sigSainteDataUrl ? (
                                       <img 
                                         src={details.sigSainteDataUrl} 
@@ -2202,8 +2451,14 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                                     )}
                                   </div>
                                   <div className="p-1.5 bg-white rounded-lg border border-slate-100 flex flex-col items-center justify-center">
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Entrante (Assumi)</span>
-                                    <strong className="text-slate-800 block truncate max-w-full font-bold mt-0.5">{details?.vendedorAssumindoName || "-"}</strong>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase">
+                                      {currentRec.status === 'resolved' ? 'Sucessor (Recebendo)' : 'Assumiu o Posto (Entrante)'}
+                                    </span>
+                                    <strong className="text-slate-800 block truncate max-w-full font-bold mt-0.5">
+                                      {currentRec.status === 'resolved'
+                                        ? (details?.vendedorAssumindoFechamento || details?.vendedorAssumindoName || 'Próximo Plantão')
+                                        : (details?.vendedorAssumindoAbertura || details?.vendedorAssumindoName || currentRec.userName)}
+                                    </strong>
                                     {details?.sigEntranteDataUrl ? (
                                       <img 
                                         src={details.sigEntranteDataUrl} 
@@ -2389,16 +2644,53 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                   </div>
                 </div>
 
-                {/* Team */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-slate-50 border rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Vigilante Sainte (Quem passou)</span>
-                    <span className="font-bold text-slate-800 text-xs">{selectedRecord.shiftBookDetails?.vendedorSaindoName || selectedRecord.userName}</span>
+                {/* Team / Plantão Lifecycle */}
+                <div className="space-y-3">
+                  {/* Abertura */}
+                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center justify-between border-b border-emerald-200 pb-1 mb-2">
+                      <span className="text-[10px] font-black uppercase text-emerald-900 flex items-center gap-1">
+                        🟢 1. Registro de Abertura do Plantão
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-800 font-bold">
+                        {selectedRecord.shiftBookDetails?.openedAtFormatted || formatarDataBR(selectedRecord.date)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 block uppercase">Vigilante que Assumiu</span>
+                        <strong className="text-slate-900">{selectedRecord.shiftBookDetails?.vendedorAssumindoAbertura || selectedRecord.shiftBookDetails?.vendedorAssumindoName || selectedRecord.userName}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-slate-500 block uppercase">Passou no Início</span>
+                        <strong className="text-slate-900">{selectedRecord.shiftBookDetails?.vendedorPassandoAbertura || selectedRecord.shiftBookDetails?.vendedorSaindoName || "Plantão Anterior"}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 border rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-400 block uppercase">Vigilante Entrante (Quem assumiu)</span>
-                    <span className="font-bold text-slate-800 text-xs">{selectedRecord.shiftBookDetails?.vendedorAssumindoName || "Não informado"}</span>
-                  </div>
+
+                  {/* Encerramento */}
+                  {selectedRecord.status === 'resolved' && (
+                    <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl">
+                      <div className="flex items-center justify-between border-b border-indigo-200 pb-1 mb-2">
+                        <span className="text-[10px] font-black uppercase text-indigo-950 flex items-center gap-1">
+                          🏁 2. Registro de Encerramento do Plantão
+                        </span>
+                        <span className="text-[10px] font-mono text-indigo-800 font-bold">
+                          {selectedRecord.shiftBookDetails?.closedAtFormatted || 'Finalizado'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-500 block uppercase">Vigilante Entregando</span>
+                          <strong className="text-slate-900">{selectedRecord.shiftBookDetails?.vendedorPassandoFechamento || selectedRecord.shiftBookDetails?.vendedorSaindoName || selectedRecord.shiftBookDetails?.vendedorAssumindoAbertura || selectedRecord.userName}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-500 block uppercase">Sucessor (Recebendo)</span>
+                          <strong className="text-slate-900">{selectedRecord.shiftBookDetails?.vendedorAssumindoFechamento || selectedRecord.shiftBookDetails?.vendedorAssumindoName || "Próximo Plantão"}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Armamento details */}
@@ -2435,13 +2727,24 @@ Ata devidamente registrada pelo Vigilante ${entranteName} e acompanhada por ${sa
                 </div>
 
                 {/* Routine / Relato */}
-                <div className="space-y-1.5 p-4 rounded-xl border border-slate-200 bg-slate-50">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-                    📝 Relato Detalhado do Turno
+                <div className="space-y-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block border-b pb-1">
+                    📝 Livro de Ocorrências & Relatos do Plantão
                   </span>
-                  <p className="text-xs font-medium text-slate-700 whitespace-pre-line leading-relaxed">
-                    {selectedRecord.shiftBookDetails?.routineDescription || selectedRecord.description}
-                  </p>
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-800 block mb-0.5">🟢 Relato de Abertura:</span>
+                    <p className="text-xs font-medium text-slate-700 whitespace-pre-line leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200">
+                      {selectedRecord.shiftBookDetails?.relatoAbertura || selectedRecord.shiftBookDetails?.routineDescription || selectedRecord.description}
+                    </p>
+                  </div>
+                  {selectedRecord.shiftBookDetails?.relatoEncerramento && (
+                    <div>
+                      <span className="text-[10px] font-bold text-indigo-900 block mb-0.5">🏁 Relato de Encerramento:</span>
+                      <p className="text-xs font-medium text-slate-700 whitespace-pre-line leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200">
+                        {selectedRecord.shiftBookDetails.relatoEncerramento}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Photos Gallery */}

@@ -188,6 +188,20 @@ export interface Occurrence {
     closedAt?: any;
     closedByName?: string;
     routineDescription?: string;
+    // Dados específicos de Abertura (Início do Turno)
+    openedAtFormatted?: string;
+    openedByName?: string;
+    vendedorPassandoAbertura?: string;
+    vendedorAssumindoAbertura?: string;
+    relatoAbertura?: string;
+    sigAberturaDataUrl?: string;
+    // Dados específicos de Encerramento (Fim do Turno)
+    closedAtFormatted?: string;
+    vendedorPassandoFechamento?: string;
+    vendedorAssumindoFechamento?: string;
+    relatoEncerramento?: string;
+    sigFechamentoSainteDataUrl?: string;
+    sigFechamentoEntranteDataUrl?: string;
   };
 }
 
