@@ -34,15 +34,12 @@
     display: none !important;
   }
 
-  /* Reset main layouts during printing */
-  html, body, #root, main, div, section {
+  /* Reset root containers during printing */
+  html, body, #root, main {
     background: white !important;
     background-color: white !important;
     color: black !important;
     box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
     width: auto !important;
     height: auto !important;
     overflow: visible !important;

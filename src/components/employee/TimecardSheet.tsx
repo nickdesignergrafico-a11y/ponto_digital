@@ -1422,7 +1422,7 @@ export default function TimecardSheet({
         >
           <div 
             ref={printRef}
-            className="bg-white shadow-2xl border border-slate-200 print:shadow-none print:border-0 text-black printable-sheet notranslate select-none shrink-0"
+            className="bg-white shadow-2xl border border-slate-200 print:shadow-none print:border-0 text-black printable-sheet notranslate select-none shrink-0 p-6 sm:p-8"
             style={{ 
               width: `${targetWidth}px`, 
               minHeight: '1123px',
@@ -1582,27 +1582,35 @@ export default function TimecardSheet({
           </table>
 
           {/* Portaria Ministerial Legal Footer Detail */}
-          <div className="mt-1 text-[8px] text-black font-semibold uppercase leading-tight">
+          <div className="mt-2.5 text-[8.5px] text-black font-semibold uppercase leading-tight">
             Obs.: Substitui o Quadro de Horário de Trabalho, de acordo com o disposto na Portaria Ministerial nº 3162 de 08/09/1982
           </div>
 
-          {/* Recognition & Data Statement */}
-          <div className="mt-2 text-[10px] font-extrabold text-black uppercase flex items-center">
-            Reconheço a exatidão destas anotações. Data:{" "}
-            {signatureDoc && signatureDoc.signedAt ? (
-              <span className="font-mono ml-1 font-black text-blue-900">
-                {format(new Date(signatureDoc.signedAt), "dd/MM/yyyy")} (ASSINADO ELETRONICAMENTE)
-              </span>
-            ) : (
-              <span className="font-mono ml-1 font-normal">_______/_______/_______</span>
-            )}
+          {/* Recognition & Date Statement with distinct clear layout */}
+          <div className="mt-2 text-[9.5px] font-extrabold text-black uppercase flex items-center justify-between border-b border-black/40 pb-1.5">
+            <span>Reconheço a exatidão destas anotações.</span>
+            <span>
+              Data:{" "}
+              {signatureDoc && signatureDoc.signedAt ? (
+                <span className="font-mono font-black text-blue-900">
+                  {format(new Date(signatureDoc.signedAt), "dd/MM/yyyy")} (ASSINADO ELETRONICAMENTE)
+                </span>
+              ) : signatureDoc && signatureDoc.adminSignedAt ? (
+                <span className="font-mono font-black text-indigo-900">
+                  {format(new Date(signatureDoc.adminSignedAt), "dd/MM/yyyy")} (VISTO ADMINISTRATIVO)
+                </span>
+              ) : (
+                <span className="font-mono font-normal">_______/_______/_______</span>
+              )}
+            </span>
           </div>
 
-          {/* Visual Line Signatures block */}
-          <div className="mt-3.5 flex justify-between gap-16">
+          {/* Visual Line Signatures block - naturally positioned above lines */}
+          <div className="mt-6 flex justify-between gap-16 items-end">
+            {/* Visto Chefia Column */}
             <div 
               className={cn(
-                "flex-1 text-center relative flex flex-col justify-end items-center h-11",
+                "flex-1 text-center flex flex-col justify-end items-center",
                 (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) && !signatureDoc?.adminSigned && "cursor-pointer group"
               )}
               onClick={() => {
@@ -1613,39 +1621,46 @@ export default function TimecardSheet({
               }}
               title={!signatureDoc?.adminSigned && (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) ? "Clique para registrar visto de Administrador" : undefined}
             >
-              {signatureDoc && signatureDoc.adminSigned ? (
-                <div className="absolute bottom-2.5 left-0 right-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                  {signatureDoc.adminSignatureDataUrl ? (
-                    <img 
-                      src={signatureDoc.adminSignatureDataUrl} 
-                      alt="Assinatura Gestor" 
-                      className="h-9 max-w-[170px] object-contain drop-shadow" 
-                    />
-                  ) : (
-                    <span className="signature-font text-[18px] font-bold text-blue-900 leading-none italic block whitespace-nowrap">
-                      {signatureDoc.adminSignatureText}
+              {/* Signature display container with fixed height */}
+              <div className="h-12 w-full flex flex-col items-center justify-end pb-1 select-none">
+                {signatureDoc && signatureDoc.adminSigned ? (
+                  <>
+                    {signatureDoc.adminSignatureDataUrl ? (
+                      <img 
+                        src={signatureDoc.adminSignatureDataUrl} 
+                        alt="Assinatura Gestor" 
+                        className="max-h-10 max-w-[170px] object-contain drop-shadow" 
+                      />
+                    ) : (
+                      <span className="signature-font text-[18px] font-bold text-blue-900 leading-none italic block whitespace-nowrap">
+                        {signatureDoc.adminSignatureText}
+                      </span>
+                    )}
+                  </>
+                ) : (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) ? (
+                  <div className="no-print mb-1">
+                    <span className="text-[9px] bg-indigo-50 group-hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1 rounded-full border border-indigo-200 shadow-sm transition-all flex items-center gap-1">
+                      <PenTool className="w-2.5 h-2.5" />
+                      Vistar Chefia
                     </span>
-                  )}
-                  <span className="text-[5.5px] text-slate-500 font-mono scale-90 block mt-0.5 uppercase tracking-tighter shrink-0 select-none">
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="border-t border-black w-full pt-1 bg-transparent">
+                <p className="text-[9px] font-extrabold text-black uppercase tracking-wider">Visto chefia</p>
+                {signatureDoc && signatureDoc.adminSigned && signatureDoc.adminSignedAt && (
+                  <span className="text-[6.5px] text-slate-600 font-mono block mt-0.5 uppercase tracking-tight select-none">
                     VISTO DIGITAL EM {format(new Date(signatureDoc.adminSignedAt), "dd/MM/yyyy")}
                   </span>
-                </div>
-              ) : (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) ? (
-                <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center no-print">
-                  <span className="text-[9px] bg-indigo-50 group-hover:bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200 shadow-sm transition-all flex items-center gap-1">
-                    <PenTool className="w-2.5 h-2.5" />
-                    Vistar Chefia
-                  </span>
-                </div>
-              ) : null}
-              <div className="border-t border-black w-4/5 mx-auto pt-1 w-full z-10 bg-transparent">
-                <p className="text-[9px] font-extrabold text-black uppercase tracking-wider">Visto chefia</p>
+                )}
               </div>
             </div>
             
+            {/* Visto Funcionário Column */}
             <div 
               className={cn(
-                "flex-1 text-center relative flex flex-col justify-end items-center h-11",
+                "flex-1 text-center flex flex-col justify-end items-center",
                 !signatureDoc?.signedAt && "cursor-pointer group"
               )}
               onClick={() => {
@@ -1656,33 +1671,39 @@ export default function TimecardSheet({
               }}
               title={!signatureDoc?.signedAt ? "Clique aqui para assinar digitalmente" : undefined}
             >
-              {signatureDoc && signatureDoc.signedAt ? (
-                <div className="absolute bottom-2.5 left-0 right-0 flex flex-col items-center justify-center pointer-events-none select-none">
-                  {signatureDoc.signatureDataUrl ? (
-                    <img 
-                      src={signatureDoc.signatureDataUrl} 
-                      alt="Assinatura" 
-                      className="h-9 max-w-[170px] object-contain drop-shadow" 
-                    />
-                  ) : (
-                    <span className="signature-font text-[18px] font-bold text-blue-900 leading-none italic block whitespace-nowrap">
-                      {signatureDoc.signatureText}
+              {/* Signature display container with fixed height */}
+              <div className="h-12 w-full flex flex-col items-center justify-end pb-1 select-none">
+                {signatureDoc && signatureDoc.signedAt ? (
+                  <>
+                    {signatureDoc.signatureDataUrl ? (
+                      <img 
+                        src={signatureDoc.signatureDataUrl} 
+                        alt="Assinatura Funcionário" 
+                        className="max-h-10 max-w-[170px] object-contain drop-shadow" 
+                      />
+                    ) : (
+                      <span className="signature-font text-[18px] font-bold text-blue-900 leading-none italic block whitespace-nowrap">
+                        {signatureDoc.signatureText}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <div className="no-print mb-1">
+                    <span className="text-[9px] bg-blue-50 group-hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded-full border border-blue-200 shadow-sm transition-all flex items-center gap-1">
+                      <PenTool className="w-2.5 h-2.5" />
+                      Clique para Assinar
                     </span>
-                  )}
-                  <span className="text-[5.5px] text-slate-500 font-mono scale-90 block mt-0.5 uppercase tracking-tighter shrink-0 select-none font-bold">
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-black w-full pt-1 bg-transparent">
+                <p className="text-[9px] font-extrabold text-black uppercase tracking-wider">Visto funcionário</p>
+                {signatureDoc && signatureDoc.signedAt && (
+                  <span className="text-[6.5px] text-slate-600 font-mono block mt-0.5 uppercase tracking-tight select-none">
                     ASSINATURA DIGITAL REGISTRADA VIA IP {signatureDoc.ipAddress || '177.84.14.93'}
                   </span>
-                </div>
-              ) : (
-                <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center no-print">
-                  <span className="text-[9px] bg-blue-50 group-hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200 shadow-sm transition-all flex items-center gap-1">
-                    <PenTool className="w-2.5 h-2.5" />
-                    Clique para Assinar
-                  </span>
-                </div>
-              )}
-              <div className="border-t border-black w-4/5 mx-auto pt-1 w-full z-10 bg-transparent">
-                <p className="text-[9px] font-extrabold text-black uppercase tracking-wider">Visto funcionário</p>
+                )}
               </div>
             </div>
           </div>
