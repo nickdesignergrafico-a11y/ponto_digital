@@ -39,6 +39,16 @@ export default function TimecardSheet({
   // Split-posto timesheet states
   const [signaturesList, setSignaturesList] = useState<any[]>([]);
   const [selectedPosto, setSelectedPosto] = useState<string>('TODOS OS POSTOS');
+  const [signTargetRole, setSignTargetRole] = useState<'employee' | 'admin'>('employee');
+
+  const normalizePost = (name?: string | null): string => {
+    if (!name) return '';
+    let str = String(name).trim().toLowerCase();
+    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (str.includes('maestro') || str.includes('frota')) return 'maestro frotas';
+    if (str.includes('portaria') || str.includes('principal')) return 'portaria principal';
+    return str;
+  };
 
   useEffect(() => {
     if (!selectedPosto) {
@@ -47,32 +57,41 @@ export default function TimecardSheet({
   }, [targetUser]);
 
   useEffect(() => {
-    if (!selectedPosto || selectedPosto === 'TODOS') {
-      const activeSig = signaturesList.find(s => s.adminSigned) || signaturesList[0];
+    if (!signaturesList || signaturesList.length === 0) {
+      setSignatureDoc(null);
+      return;
+    }
+
+    const selNorm = normalizePost(selectedPosto);
+    const isAll = !selectedPosto || selNorm === 'todos' || selNorm === 'todos os postos' || selNorm === 'all' || selNorm === '';
+
+    if (isAll) {
+      // Prioritize fully homologated (both signed), or employee-signed, or admin-signed
+      const activeSig = signaturesList.find(s => s.adminSigned && s.signedAt) || 
+                        signaturesList.find(s => s.signedAt) || 
+                        signaturesList.find(s => s.adminSigned) || 
+                        signaturesList[0];
       setSignatureDoc(activeSig || null);
       return;
     }
 
+    // Match signature for specific post with normalization
     const activeSig = signaturesList.find(s => {
-      const pName = s.postoName || 'Portaria Principal';
-      return pName.toLowerCase().trim() === (selectedPosto || 'Portaria Principal').toLowerCase().trim();
+      const sNorm = normalizePost(s.postoName || targetUser?.postoName || 'Portaria Principal');
+      return sNorm === selNorm;
     });
-    
+
     if (activeSig) {
       setSignatureDoc(activeSig);
     } else {
-      // If no active signature is found, check if we are on the default post (Portaria Principal)
-      // and there's an old general signature (without the postoName field).
-      const isDefaultPostSelected = (selectedPosto || 'Portaria Principal').toLowerCase().trim() === 'portaria principal';
-      const oldGeneralSig = signaturesList.find(s => !s.postoName);
-      
-      if (isDefaultPostSelected && oldGeneralSig) {
-        setSignatureDoc(oldGeneralSig);
-      } else {
-        setSignatureDoc(null);
-      }
+      // Fallback: If signature exists for the user in this month, don't leave it blank
+      const fallbackSig = signaturesList.find(s => s.adminSigned && s.signedAt) || 
+                          signaturesList.find(s => s.signedAt) || 
+                          signaturesList.find(s => s.adminSigned) || 
+                          signaturesList[0];
+      setSignatureDoc(fallbackSig || null);
     }
-  }, [signaturesList, selectedPosto]);
+  }, [signaturesList, selectedPosto, targetUser]);
 
   useEffect(() => {
     if (initialMonth) {
@@ -309,7 +328,7 @@ export default function TimecardSheet({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleEditDayClick = (day: Date) => {
-    const isAllowedToEdit = user?.role === 'admin' || isBlankTimecardMode;
+    const isAllowedToEdit = user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true || isBlankTimecardMode;
     if (!isAllowedToEdit || !targetUser) return;
     
     setSaveError(null);
@@ -355,32 +374,38 @@ export default function TimecardSheet({
     let lng = -46.6333;
 
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error("Navegador sem suporte a geolocalização"));
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos),
-          (err) => reject(err),
-          { enableHighAccuracy: true, timeout: 6000 }
-        );
-      });
-      lat = position.coords.latitude;
-      lng = position.coords.longitude;
+      if (navigator.geolocation) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(pos),
+            (err) => reject(err),
+            { enableHighAccuracy: false, timeout: 2000, maximumAge: 60000 }
+          );
+        });
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+      }
     } catch (e) {
-      console.warn("Não foi possível capturar geolocalização exata para o ajuste manual:", e);
+      console.warn("Geolocalização simplificada para ajuste manual:", e);
     }
 
     try {
       const types: ('entry' | 'lunch_out' | 'lunch_in' | 'exit')[] = ['entry', 'lunch_out', 'lunch_in', 'exit'];
-      const targetPosto = selectedPosto || targetUser.postoName || 'Portaria Principal';
       
+      const selNorm = normalizePost(selectedPosto);
+      const isAll = !selectedPosto || selNorm === 'todos' || selNorm === 'todos os postos' || selNorm === 'all' || selNorm === '';
+      const targetPosto = isAll 
+        ? (targetUser.postoName || 'Maestro Frotas')
+        : (selectedPosto || targetUser.postoName || 'Maestro Frotas');
+
+      const isUserAdmin = user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true;
+      const signatureLabel = isUserAdmin ? 'MANUAL-ADJUSTMENT-ADMIN' : 'MANUAL-ADJUSTMENT-BLANK-SHEET';
+
       for (const type of types) {
         const timeVal = editPunches[type];
         const originalId = editPunchesIds[type];
         
-        if (timeVal) {
+        if (timeVal && timeVal.includes(':')) {
           const [hours, minutes] = timeVal.split(':').map(Number);
           const punchDate = new Date(selectedEditDay);
           punchDate.setHours(hours, minutes, 0, 0);
@@ -400,18 +425,22 @@ export default function TimecardSheet({
             const colRef = isBlankTimecardMode && blankTimecardId
               ? collection(db, 'blankTimecards', blankTimecardId, 'attendance')
               : collection(db, 'attendance');
-            await addDoc(colRef, {
+            
+            const punchData: any = {
               userId: targetUser.uid,
-              userName: targetUser.name,
+              userName: targetUser.name || 'Colaborador',
               userCpf: targetUser.cpf ? targetUser.cpf.replace(/\D/g, '') : '',
               userEmail: targetUser.email || '',
               type: type,
               timestamp: punchDate,
-              signature: user?.role === 'admin' ? 'MANUAL-ADJUSTMENT-ADMIN' : 'MANUAL-ADJUSTMENT-BLANK-SHEET',
+              signature: signatureLabel,
               location: { latitude: lat, longitude: lng },
-              selfieURL: null,
               postoName: targetPosto
-            });
+            };
+            if (isBlankTimecardMode) {
+              punchData.isManual = true;
+            }
+            await addDoc(colRef, punchData);
           }
         } else if (originalId) {
           // Cleared time, delete record
@@ -422,31 +451,35 @@ export default function TimecardSheet({
         }
       }
       
-      if (user?.role === 'admin') {
-        if (targetUser.uid !== user?.uid) {
+      try {
+        if (isUserAdmin) {
+          if (targetUser.uid !== user?.uid) {
+            await createNotification(
+              targetUser.uid,
+              'Folha de Ponto Alterada',
+              `Sua folha de ponto de ${format(selectedEditDay, "MMMM/yyyy", { locale: ptBR })} teve alterações de horários realizadas pela Administração.`,
+              'success',
+              'timecard'
+            );
+          }
+        } else {
           await createNotification(
-            targetUser.uid,
-            'Folha de Ponto Alterada',
-            `Sua folha de ponto de ${format(selectedEditDay, "MMMM/yyyy", { locale: ptBR })} teve alterações realizadas pela Administração.`,
-            'success',
-            'timecard'
+            'admin',
+            'Folha em Branco Preenchida',
+            `O colaborador ${user?.name || 'Vigilante'} preencheu pontos manualmente para o dia ${format(selectedEditDay, "dd/MM/yyyy")}.`,
+            'info',
+            'blank_timecard'
           );
         }
-      } else {
-        await createNotification(
-          'admin',
-          'Folha em Branco Preenchida',
-          `O colaborador ${user?.name || 'Vigilante'} preencheu pontos manualmente para o dia ${format(selectedEditDay, "dd/MM/yyyy")}.`,
-          'info',
-          'blank_timecard'
-        );
+      } catch (notifErr) {
+        console.warn("Erro ao disparar notificação de alteração de ponto:", notifErr);
       }
 
       await fetchData();
       setShowEditPunchModal(false);
     } catch (err: any) {
       console.error("Error saving manual adjustment", err);
-      setSaveError(err.message || 'Erro de permissão ou rede ao salvar alterações. Verifique o console ou as regras do Firebase.');
+      setSaveError(err.message || 'Erro ao salvar alterações de horários.');
     } finally {
       setSavingEdit(false);
     }
@@ -464,15 +497,23 @@ export default function TimecardSheet({
       if (isNaN(date.getTime()) || !isSameDay(date, day)) return false;
 
       // If 'TODOS OS POSTOS' or no specific filter selected, include all punches for this day
-      const selUpper = (selectedPosto || 'TODOS').toUpperCase().trim();
-      if (selUpper === 'TODOS' || selUpper === 'TODOS OS POSTOS' || selUpper === 'ALL') {
+      const selNorm = normalizePost(selectedPosto);
+      const isAll = !selectedPosto || selNorm === 'todos' || selNorm === 'todos os postos' || selNorm === 'all' || selNorm === '';
+      if (isAll) {
         return true;
       }
 
-      // Filter by selectedPosto
-      const itemPosto = (p.postoName || targetUser?.postoName || 'Portaria Principal').toLowerCase().trim();
-      const targetPosto = selectedPosto.toLowerCase().trim();
-      return itemPosto === targetPosto;
+      // Filter by selectedPosto with robust fallback to employee post
+      const targetPostNorm = selNorm;
+      const userPostNorm = normalizePost(targetUser?.postoName);
+      let punchPostNorm = normalizePost(p.postoName);
+
+      // If punch post is empty, generic, or matches employee's main assigned post (or filter is employee's post)
+      if (!punchPostNorm || punchPostNorm === 'portaria principal' || punchPostNorm === 'sentinela' || punchPostNorm === userPostNorm || targetPostNorm === userPostNorm) {
+        return true;
+      }
+
+      return punchPostNorm === targetPostNorm;
     });
   };
 
@@ -648,10 +689,16 @@ export default function TimecardSheet({
         }
       }
 
-      const cleanPosto = (selectedPosto || 'Portaria Principal').trim();
+      const selNorm = normalizePost(selectedPosto);
+      const isAll = !selectedPosto || selNorm === 'todos' || selNorm === 'todos os postos' || selNorm === 'all' || selNorm === '';
+      const cleanPosto = isAll 
+        ? (targetUser.postoName || 'Maestro Frotas')
+        : (selectedPosto || targetUser.postoName || 'Maestro Frotas').trim();
+      
       const cleanPostoKey = cleanPosto.toLowerCase().replace(/[^a-z0-9]/g, '_');
       const sigId = `${targetUser.uid}_${currentMonth.getFullYear()}_${currentMonth.getMonth() + 1}_${cleanPostoKey}`;
-      const isAdminSign = user?.role === 'admin';
+      const isUserAdmin = user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true;
+      const isAdminSign = isUserAdmin && signTargetRole === 'admin';
       
       let payload: any = {};
       if (isAdminSign) {
@@ -659,7 +706,7 @@ export default function TimecardSheet({
           ...(signatureDoc || {}),
           id: sigId,
           userId: targetUser.uid,
-          userName: targetUser.name,
+          userName: targetUser.name || 'Colaborador',
           month: currentMonth.getMonth() + 1,
           year: currentMonth.getFullYear(),
           postoName: cleanPosto,
@@ -678,7 +725,7 @@ export default function TimecardSheet({
           ...(signatureDoc || {}),
           id: sigId,
           userId: targetUser.uid,
-          userName: targetUser.name,
+          userName: targetUser.name || 'Colaborador',
           month: currentMonth.getMonth() + 1,
           year: currentMonth.getFullYear(),
           postoName: cleanPosto,
@@ -695,7 +742,17 @@ export default function TimecardSheet({
       const sigDocRef = isBlankTimecardMode && blankTimecardId
         ? doc(db, 'blankTimecards', blankTimecardId, 'signatures', sigId)
         : doc(db, 'timecardSignatures', sigId);
-      await setDoc(sigDocRef, payload);
+      await setDoc(sigDocRef, payload, { merge: true });
+      
+      setSignaturesList(prev => {
+        const existingIdx = prev.findIndex(s => s.id === sigId);
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = payload;
+          return updated;
+        }
+        return [...prev, payload];
+      });
       setSignatureDoc(payload);
 
       if (isAdminSign) {
@@ -746,7 +803,7 @@ export default function TimecardSheet({
   // Unique posts list computed on-the-fly from punches, signatures, and current profile post
   const punchesPosts = punches.map(p => p.postoName).filter(Boolean);
   const signaturePosts = signaturesList.map(s => s.postoName).filter(Boolean);
-  const employeeCurrentPost = targetUser?.postoName || 'Portaria Principal';
+  const employeeCurrentPost = targetUser?.postoName || 'Maestro Frotas';
 
   const combinedPosts = [employeeCurrentPost, ...punchesPosts, ...signaturePosts]
     .map(p => String(p).trim())
@@ -756,9 +813,14 @@ export default function TimecardSheet({
   uniquePostsMap.set('todos', 'TODOS OS POSTOS');
 
   for (const postName of combinedPosts) {
-    const lowerKey = postName.toLowerCase();
-    if (!uniquePostsMap.has(lowerKey)) {
-      uniquePostsMap.set(lowerKey, postName);
+    const normKey = normalizePost(postName);
+    // If employee is assigned to a real post like Maestro Frotas, skip legacy default 'Portaria Principal' tab
+    if (normKey === 'portaria principal' && normalizePost(targetUser?.postoName) !== 'portaria principal') {
+      continue;
+    }
+    if (!uniquePostsMap.has(normKey)) {
+      const canonicalName = normKey === 'maestro frotas' ? 'Maestro Frotas' : postName;
+      uniquePostsMap.set(normKey, canonicalName);
     }
   }
 
@@ -939,17 +1001,21 @@ export default function TimecardSheet({
               const currentSelUpper = (selectedPosto || 'TODOS').toUpperCase();
               const isActive = isAllPostsTab
                 ? (currentSelUpper.includes('TODOS') || currentSelUpper === 'ALL')
-                : (selectedPosto || '').toLowerCase().trim() === posto.toLowerCase().trim();
+                : normalizePost(selectedPosto) === normalizePost(posto);
               
               // Verify existance of signature
-              const existsSigned = signaturesList.some(s => {
-                const sName = s.postoName || 'Portaria Principal';
-                return sName.toLowerCase().trim() === posto.toLowerCase().trim();
-              });
-              const isHomologated = signaturesList.some(s => {
-                const sName = s.postoName || 'Portaria Principal';
-                return sName.toLowerCase().trim() === posto.toLowerCase().trim() && s.adminSigned;
-              });
+              const existsSigned = isAllPostsTab
+                ? signaturesList.some(s => s.signedAt)
+                : signaturesList.some(s => {
+                    const sNorm = normalizePost(s.postoName || targetUser?.postoName);
+                    return sNorm === normalizePost(posto) && s.signedAt;
+                  });
+              const isHomologated = isAllPostsTab
+                ? signaturesList.some(s => s.adminSigned)
+                : signaturesList.some(s => {
+                    const sNorm = normalizePost(s.postoName || targetUser?.postoName);
+                    return sNorm === normalizePost(posto) && s.adminSigned;
+                  });
 
               return (
                 <button
@@ -963,14 +1029,12 @@ export default function TimecardSheet({
                   )}
                 >
                   <span>{posto}</span>
-                  {!isAllPostsTab && (
-                    isHomologated ? (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100" title="Homologado (RH)" />
-                    ) : existsSigned ? (
-                      <span className="w-2 h-2 rounded-full bg-blue-500 ring-2 ring-blue-100" title="Assinado pelo Colaborador" />
-                    ) : (
-                      <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-100" title="Assinatura Pendente" />
-                    )
+                  {isHomologated ? (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100" title="Homologado (RH)" />
+                  ) : existsSigned ? (
+                    <span className="w-2 h-2 rounded-full bg-blue-500 ring-2 ring-blue-100" title="Assinado pelo Colaborador" />
+                  ) : (
+                    <span className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-amber-100" title="Assinatura Pendente" />
                   )}
                 </button>
               );
@@ -1046,35 +1110,69 @@ export default function TimecardSheet({
                 <div className="bg-slate-50 border border-slate-100 rounded-3xl p-4 space-y-3">
                   <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Status da Assinatura</span>
                   
-                  {signatureDoc ? (
-                    signatureDoc.adminSigned ? (
-                      <div className="flex items-start gap-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100/60 p-3.5 rounded-2xl text-xs font-semibold">
-                        <Check className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div className="text-left">
-                          <p className="font-black">Original Homologado pelo Administrador</p>
-                          <p className="text-[10px] opacity-80 mt-1 font-medium normal-case">Visado e homologado administrativamente com sucesso.</p>
-                        </div>
+                  {signatureDoc && signatureDoc.signedAt && signatureDoc.adminSigned ? (
+                    <div className="flex items-start gap-2.5 text-emerald-700 bg-emerald-50 border border-emerald-100/60 p-3.5 rounded-2xl text-xs font-semibold">
+                      <Check className="w-4 h-4 shrink-0 mt-0.5" />
+                      <div className="text-left">
+                        <p className="font-black">Original Homologado pelo Administrador</p>
+                        <p className="text-[10px] opacity-80 mt-1 font-medium normal-case">Visado e homologado administrativamente com sucesso.</p>
                       </div>
-                    ) : (
-                      <div className="flex items-start gap-2.5 text-indigo-700 bg-indigo-50 border border-indigo-100/60 p-3.5 rounded-2xl text-xs font-semibold">
+                    </div>
+                  ) : signatureDoc && signatureDoc.signedAt && !signatureDoc.adminSigned ? (
+                    <div className="bg-white border border-indigo-100 p-4 rounded-2xl space-y-3">
+                      <div className="flex items-start gap-2.5 text-indigo-700 text-xs font-semibold">
                         <PenTool className="w-4 h-4 shrink-0 mt-0.5" />
                         <div className="text-left">
                           <p className="font-black">Assinado por Você</p>
-                          <p className="text-[10px] opacity-80 mt-1 font-medium normal-case">Folha enviada com sucesso ao Administrador. Aguardando homologação.</p>
-                          {user?.role === 'admin' && (
-                            <button 
-                              onClick={() => {
-                                setIsMenuOpen(false);
-                                setShowSignModal(true);
-                              }}
-                              className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs shadow-md shadow-indigo-600/10 cursor-pointer"
-                            >
-                              Dar Visto Administrativo / Homologar
-                            </button>
-                          )}
+                          <p className="text-[10px] opacity-80 mt-1 font-medium normal-case">Folha assinada em {format(new Date(signatureDoc.signedAt), "dd/MM/yyyy")}. Aguardando visto do Administrador.</p>
                         </div>
                       </div>
-                    )
+                      {user?.role === 'admin' ? (
+                        <button 
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setSignTargetRole('admin');
+                            setShowSignModal(true);
+                          }}
+                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 px-4 rounded-xl text-xs shadow-md shadow-indigo-600/10 cursor-pointer"
+                        >
+                          Dar Visto Administrativo / Homologar
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setSignTargetRole('employee');
+                            setShowSignModal(true);
+                          }}
+                          className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold py-2.5 px-4 rounded-xl text-xs cursor-pointer"
+                        >
+                          Reassinar Folha
+                        </button>
+                      )}
+                    </div>
+                  ) : signatureDoc && signatureDoc.adminSigned && !signatureDoc.signedAt ? (
+                    <div className="bg-white border border-blue-200 p-4 rounded-2xl space-y-3">
+                      <div className="flex items-start gap-2.5 text-blue-700 text-xs font-bold text-left">
+                        <PenTool className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 animate-pulse" />
+                        <div>
+                          <p className="font-black">Sua Assinatura é Necessária</p>
+                          <p className="text-[10px] text-slate-600 font-medium normal-case mt-1 leading-relaxed">
+                            O Administrador já registrou o visto prévio. Assine para concluir a homologação.
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          setSignTargetRole('employee');
+                          setShowSignModal(true);
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 px-4 rounded-2xl text-xs shadow-lg shadow-blue-500/15 cursor-pointer"
+                      >
+                        Assinar Digitalmente e Enviar
+                      </button>
+                    </div>
                   ) : (
                     <div className="bg-white border border-slate-200/60 p-4 rounded-2xl space-y-3">
                       <div className="flex items-start gap-2.5 text-rose-700 text-xs font-bold text-left">
@@ -1085,15 +1183,30 @@ export default function TimecardSheet({
                         </div>
                       </div>
                       
-                      <button 
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          setShowSignModal(true);
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 px-4 rounded-2xl text-xs shadow-lg shadow-blue-500/15 cursor-pointer"
-                      >
-                        {user?.role === 'admin' ? 'Vistar como Administrador' : 'Assinar Digitalmente e Enviar'}
-                      </button>
+                      <div className="space-y-2">
+                        {user?.role === 'admin' && (
+                          <button 
+                            onClick={() => {
+                              setIsMenuOpen(false);
+                              setSignTargetRole('admin');
+                              setShowSignModal(true);
+                            }}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-4 rounded-2xl text-xs shadow-md shadow-indigo-500/15 cursor-pointer"
+                          >
+                            Vistar como Administrador
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setSignTargetRole('employee');
+                            setShowSignModal(true);
+                          }}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 px-4 rounded-2xl text-xs shadow-lg shadow-blue-500/15 cursor-pointer"
+                        >
+                          Assinar Digitalmente e Enviar
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1149,8 +1262,8 @@ export default function TimecardSheet({
 
       {/* Desktop-Only Signature Alert Banners */}
       <div className="hidden md:block space-y-6">
-        {/* CASE 1: Employee hasn't signed yet */}
-        {!signatureDoc && (
+        {/* CASE 1: Neither signed or no signature document yet */}
+        {(!signatureDoc || (!signatureDoc.signedAt && !signatureDoc.adminSigned)) && (
           <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-200 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print shadow-xl shadow-blue-500/5">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20 text-white shrink-0">
@@ -1160,33 +1273,40 @@ export default function TimecardSheet({
                 <h3 className="text-lg font-black text-slate-900">Assinatura Digital Pendente</h3>
                 <p className="text-sm text-slate-500 font-medium font-sans">
                   {user?.role === 'admin' 
-                    ? `Esta folha de ponto mensal de ${format(currentMonth, 'MMMM yyyy', { locale: ptBR })} ainda não foi assinada por ${targetUser?.name}.`
+                    ? `Esta folha de ponto mensal de ${format(currentMonth, 'MMMM yyyy', { locale: ptBR })} precisa ser assinada pelo colaborador e homologada pela administração.`
                     : `Sua folha de ponto de ${format(currentMonth, 'MMMM yyyy', { locale: ptBR })} precisa ser assinada digitalmente para envio à Administração.`}
                 </p>
               </div>
             </div>
-            {user?.role === 'admin' ? (
+            <div className="flex items-center gap-3">
+              {user?.role === 'admin' && (
+                <button 
+                  onClick={() => {
+                    setSignTargetRole('admin');
+                    setShowSignModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-indigo-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  Vistar Antecipadamente (Administrador)
+                </button>
+              )}
               <button 
-                onClick={() => setShowSignModal(true)}
-                className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-indigo-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                Vistar Antecipadamente (Administrador)
-              </button>
-            ) : (
-              <button 
-                onClick={() => setShowSignModal(true)}
+                onClick={() => {
+                  setSignTargetRole('employee');
+                  setShowSignModal(true);
+                }}
                 className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-blue-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
                 Assinar Digitalmente e Enviar
               </button>
-            )}
+            </div>
           </div>
         )}
 
         {/* CASE 2: Employee signed, but administrator visto is pending */}
-        {signatureDoc && !signatureDoc.adminSigned && (
+        {signatureDoc && signatureDoc.signedAt && !signatureDoc.adminSigned && (
           <div className="bg-gradient-to-r from-indigo-500/10 to-blue-500/10 border border-indigo-200 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print shadow-xl shadow-indigo-500/5">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 text-white shrink-0">
@@ -1196,44 +1316,94 @@ export default function TimecardSheet({
                 <h3 className="text-lg font-black text-slate-900">Visto da Chefia Pendente</h3>
                 <p className="text-sm text-slate-500 font-medium font-sans">
                   {user?.role === 'admin' 
-                    ? `Folha assinada eletronicamente pelo funcionário em ${format(new Date(signatureDoc.signedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}. Registre seu visto digital.`
+                    ? `Folha assinada eletronicamente pelo funcionário em ${format(new Date(signatureDoc.signedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}. Registre seu visto digital para homologação.`
                     : `Você assinou digitalmente em ${format(new Date(signatureDoc.signedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}. Aguardando validação e visto do Administrador.`}
                 </p>
               </div>
             </div>
-            {user?.role === 'admin' && (
-              <button 
-                onClick={() => setShowSignModal(true)}
-                className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-indigo-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer animate-pulse"
-              >
-                <Check className="w-4 h-4" />
-                Assinar e Homologar (Visto Administrador)
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {user?.role === 'admin' ? (
+                <button 
+                  onClick={() => {
+                    setSignTargetRole('admin');
+                    setShowSignModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-indigo-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer animate-pulse"
+                >
+                  <Check className="w-4 h-4" />
+                  Assinar e Homologar (Visto Administrador)
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setSignTargetRole('employee');
+                    setShowSignModal(true);
+                  }}
+                  className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-3 rounded-xl text-xs transition-all cursor-pointer"
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  Reassinar
+                </button>
+              )}
+            </div>
           </div>
         )}
 
-        {/* CASE 3: Both signed & homologated */}
-        {signatureDoc && signatureDoc.adminSigned && (
-          <div className="bg-emerald-50/80 border border-emerald-200 rounded-3xl p-6 flex items-center gap-4 no-print shadow-lg shadow-emerald-500/5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shrink-0">
-              <Check className="w-6 h-6 animate-bounce" />
+        {/* CASE 3: Admin signed antecipadamente, but Employee signature is pending */}
+        {signatureDoc && signatureDoc.adminSigned && !signatureDoc.signedAt && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-indigo-500/10 border border-blue-200 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print shadow-xl shadow-blue-500/5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20 text-white shrink-0">
+                <PenTool className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Sua Assinatura é Necessária</h3>
+                <p className="text-sm text-slate-600 font-medium font-sans">
+                  O Administrador ({signatureDoc.adminSignedBy || 'RH'}) já registrou o visto prévio. Assine digitalmente sua folha de ponto para concluir a validação mensal.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-lg font-bold text-emerald-900">Folha de Ponto Homologada pela Administração</h4>
-              <p className="text-sm text-emerald-700 font-medium leading-relaxed font-sans">
-                {signatureDoc.signedAt ? (
-                  <>Assinada digitalmente pelo colaborador em ${format(new Date(signatureDoc.signedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.</>
-                ) : (
-                  <>Visto administrativo lançado antecipadamente.</>
-                )}
-                <br />
-                Vistada e validada digitalmente pelo Administrador em {format(new Date(signatureDoc.adminSignedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} por {signatureDoc.adminSignedBy || 'Administrador'}.
-                <span className="text-xs text-emerald-600 font-mono block mt-1 uppercase font-bold tracking-tighter">
-                  ID DE HOMOLOGAÇÃO: SHA256-{(signatureDoc.id || '').toUpperCase()} • IP DO ADMINISTRADOR: {signatureDoc.adminIpAddress || '177.84.14.93'}
-                </span>
-              </p>
+            <button 
+              onClick={() => {
+                setSignTargetRole('employee');
+                setShowSignModal(true);
+              }}
+              className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 font-black px-6 py-4 rounded-2xl shadow-xl shadow-blue-500/25 transition-all text-sm shrink-0 active:scale-95 cursor-pointer"
+            >
+              <Check className="w-4 h-4" />
+              Assinar Digitalmente e Enviar
+            </button>
+          </div>
+        )}
+
+        {/* CASE 4: Both signed & homologated */}
+        {signatureDoc && signatureDoc.signedAt && signatureDoc.adminSigned && (
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-3xl p-6 flex items-center justify-between gap-4 no-print shadow-lg shadow-emerald-500/5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shrink-0">
+                <Check className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-emerald-900">Folha de Ponto Homologada pela Administração</h4>
+                <p className="text-sm text-emerald-700 font-medium leading-relaxed font-sans">
+                  Assinada digitalmente pelo colaborador em {format(new Date(signatureDoc.signedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
+                  <br />
+                  Vistada e validada digitalmente pelo Administrador em {format(new Date(signatureDoc.adminSignedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} por {signatureDoc.adminSignedBy || 'Administrador'}.
+                  <span className="text-xs text-emerald-600 font-mono block mt-1 uppercase font-bold tracking-tighter">
+                    ID DE HOMOLOGAÇÃO: SHA256-{(signatureDoc.id || '').toUpperCase()} • IP DO ADMINISTRADOR: {signatureDoc.adminIpAddress || '177.84.14.93'}
+                  </span>
+                </p>
+              </div>
             </div>
+            <button 
+              onClick={() => {
+                setSignTargetRole(user?.role === 'admin' ? 'admin' : 'employee');
+                setShowSignModal(true);
+              }}
+              className="px-4 py-2.5 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-800 font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0"
+            >
+              Visualizar Assinatura
+            </button>
           </div>
         )}
       </div>
@@ -1360,10 +1530,10 @@ export default function TimecardSheet({
                     className={cn(
                       "h-[21px]", 
                       isWeekend && !hasPunches && "bg-slate-50/50",
-                      (user?.role === 'admin' || isBlankTimecardMode) && "cursor-pointer hover:bg-indigo-50/70 transition-all select-none border-indigo-200"
+                      (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true || isBlankTimecardMode) && "cursor-pointer hover:bg-indigo-50/70 transition-all select-none border-indigo-200"
                     )}
-                    onClick={() => (user?.role === 'admin' || isBlankTimecardMode) ? handleEditDayClick(day) : undefined}
-                    title={(user?.role === 'admin' || isBlankTimecardMode) ? "Clique para ajustar os horários deste dia" : undefined}
+                    onClick={() => (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true || isBlankTimecardMode) ? handleEditDayClick(day) : undefined}
+                    title={(user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true || isBlankTimecardMode) ? "Clique para ajustar os horários deste dia" : undefined}
                   >
                     {/* Day Number */}
                     <td className="border border-black p-0.5 text-center font-bold font-mono">
@@ -1430,8 +1600,20 @@ export default function TimecardSheet({
 
           {/* Visual Line Signatures block */}
           <div className="mt-3.5 flex justify-between gap-16">
-            <div className="flex-1 text-center relative flex flex-col justify-end items-center h-11">
-              {signatureDoc && signatureDoc.adminSigned && (
+            <div 
+              className={cn(
+                "flex-1 text-center relative flex flex-col justify-end items-center h-11",
+                (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) && !signatureDoc?.adminSigned && "cursor-pointer group"
+              )}
+              onClick={() => {
+                if ((user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) && !signatureDoc?.adminSigned) {
+                  setSignTargetRole('admin');
+                  setShowSignModal(true);
+                }
+              }}
+              title={!signatureDoc?.adminSigned && (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) ? "Clique para registrar visto de Administrador" : undefined}
+            >
+              {signatureDoc && signatureDoc.adminSigned ? (
                 <div className="absolute bottom-2.5 left-0 right-0 flex flex-col items-center justify-center pointer-events-none select-none">
                   {signatureDoc.adminSignatureDataUrl ? (
                     <img 
@@ -1448,14 +1630,33 @@ export default function TimecardSheet({
                     VISTO DIGITAL EM {format(new Date(signatureDoc.adminSignedAt), "dd/MM/yyyy")}
                   </span>
                 </div>
-              )}
+              ) : (user?.role === 'admin' || user?.email === 'nickdesignergrafico@gmail.com' || (user as any)?.isAdmin === true) ? (
+                <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center no-print">
+                  <span className="text-[9px] bg-indigo-50 group-hover:bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200 shadow-sm transition-all flex items-center gap-1">
+                    <PenTool className="w-2.5 h-2.5" />
+                    Vistar Chefia
+                  </span>
+                </div>
+              ) : null}
               <div className="border-t border-black w-4/5 mx-auto pt-1 w-full z-10 bg-transparent">
                 <p className="text-[9px] font-extrabold text-black uppercase tracking-wider">Visto chefia</p>
               </div>
             </div>
             
-            <div className="flex-1 text-center relative flex flex-col justify-end items-center h-11">
-              {signatureDoc && signatureDoc.signedAt && (
+            <div 
+              className={cn(
+                "flex-1 text-center relative flex flex-col justify-end items-center h-11",
+                !signatureDoc?.signedAt && "cursor-pointer group"
+              )}
+              onClick={() => {
+                if (!signatureDoc?.signedAt) {
+                  setSignTargetRole('employee');
+                  setShowSignModal(true);
+                }
+              }}
+              title={!signatureDoc?.signedAt ? "Clique aqui para assinar digitalmente" : undefined}
+            >
+              {signatureDoc && signatureDoc.signedAt ? (
                 <div className="absolute bottom-2.5 left-0 right-0 flex flex-col items-center justify-center pointer-events-none select-none">
                   {signatureDoc.signatureDataUrl ? (
                     <img 
@@ -1470,6 +1671,13 @@ export default function TimecardSheet({
                   )}
                   <span className="text-[5.5px] text-slate-500 font-mono scale-90 block mt-0.5 uppercase tracking-tighter shrink-0 select-none font-bold">
                     ASSINATURA DIGITAL REGISTRADA VIA IP {signatureDoc.ipAddress || '177.84.14.93'}
+                  </span>
+                </div>
+              ) : (
+                <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center no-print">
+                  <span className="text-[9px] bg-blue-50 group-hover:bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200 shadow-sm transition-all flex items-center gap-1">
+                    <PenTool className="w-2.5 h-2.5" />
+                    Clique para Assinar
                   </span>
                 </div>
               )}
@@ -1503,12 +1711,14 @@ export default function TimecardSheet({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-black text-slate-900">
-                    {user?.role === 'admin' ? 'Visto Digital da Chefia (Administrador)' : 'Assinatura Eletrônica'}
+                    {user?.role === 'admin' && signTargetRole === 'admin' 
+                      ? 'Visto Digital da Chefia (Administrador)' 
+                      : 'Assinatura Eletrônica do Colaborador'}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    {user?.role === 'admin' 
-                      ? 'Registre seu visto digital de homologação como representante do Administrador.'
-                      : 'Escolha seu método de assinatura para a folha de ponto.'}
+                    {user?.role === 'admin' && signTargetRole === 'admin'
+                      ? 'Registre seu visto digital de homologação como representante da empresa.'
+                      : `Assinatura de ${targetUser?.name || 'Colaborador'} para validação da folha mensal.`}
                   </p>
                 </div>
                 <button 
@@ -1520,8 +1730,42 @@ export default function TimecardSheet({
                 </button>
               </div>
 
+              {/* Admin Role Selector Tabs when user is Admin */}
+              {user?.role === 'admin' && (
+                <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignTargetRole('admin');
+                      setTypedName(user?.name || '');
+                    }}
+                    className={cn(
+                      "flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                      signTargetRole === 'admin' ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Visto Chefia (Administrador)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignTargetRole('employee');
+                      setTypedName(targetUser?.name || '');
+                    }}
+                    className={cn(
+                      "flex-1 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                      signTargetRole === 'employee' ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    <PenTool className="w-3.5 h-3.5" />
+                    Assinatura Funcionário
+                  </button>
+                </div>
+              )}
+
               {/* Info for Admin if no profile signature exists */}
-              {user?.role === 'admin' && !user?.signatureURL && (
+              {user?.role === 'admin' && signTargetRole === 'admin' && !user?.signatureURL && (
                 <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-3xl text-left space-y-2">
                   <div className="flex gap-2.5 text-blue-900 font-bold text-xs">
                     <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
