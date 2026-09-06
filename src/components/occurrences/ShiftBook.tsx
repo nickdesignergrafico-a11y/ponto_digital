@@ -1007,6 +1007,15 @@ ${finalRelatoEncerramento}` : `[TURNO EM ANDAMENTO - Aguardando encerramento pel
                           const found = servicePosts.find(p => p.id === val);
                           if (found) {
                             setPostoName(found.name);
+                            if (found.isArmed !== undefined) {
+                              handleToggleWeapons(Boolean(found.isArmed));
+                              if (found.isArmed) {
+                                if (found.weaponDetails?.tipo) setWeaponsTipo(found.weaponDetails.tipo);
+                                if (found.weaponDetails?.numeroSerie) setWeaponsNumeroSerie(found.weaponDetails.numeroSerie);
+                                if (found.weaponDetails?.quantidadeMunicao !== undefined) setWeaponsQuantidadeMunicao(found.weaponDetails.quantidadeMunicao);
+                                if (found.vestDetails?.numeroSerie) setColeteNumero(found.vestDetails.numeroSerie);
+                              }
+                            }
                           }
                         }}
                         className="px-3.5 py-2.5 border border-indigo-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-indigo-50/55 font-bold text-indigo-700"
@@ -1014,7 +1023,7 @@ ${finalRelatoEncerramento}` : `[TURNO EM ANDAMENTO - Aguardando encerramento pel
                         <option value="">-- Selecione um posto cadastrado para facilitar o preenchimento --</option>
                         {servicePosts.map(post => (
                           <option key={post.id} value={post.id}>
-                            {post.name} {post.companyName ? `(${post.companyName})` : ''}
+                            {post.isArmed ? '🔴 [ARMADO] ' : '🟢 [DESARMADO] '}{post.name} {post.companyName ? `(${post.companyName})` : ''}
                           </option>
                         ))}
                       </select>
