@@ -205,10 +205,32 @@ export interface Occurrence {
   };
 }
 
+export interface ServicePostWeapon {
+  tipo?: string;
+  marca?: string;
+  calibre?: string;
+  numeroSerie?: string;
+  quantidadeMunicao?: number | string;
+  registroSinarm?: string;
+  observacoes?: string;
+}
+
+export interface ServicePostVest {
+  numeroSerie?: string;
+  marca?: string;
+  nivelProtecao?: string;
+  tamanho?: string;
+  validade?: string;
+  observacoes?: string;
+}
+
 export interface ServicePost {
   id: string;
   name: string;
   companyName: string;
+  isArmed?: boolean;
+  weaponDetails?: ServicePostWeapon;
+  vestDetails?: ServicePostVest;
   colaboradores: string[]; // List of employees acting on the post
   vigilantes: string[];    // List of vigilantes assigned to this post
   createdAt: any;
