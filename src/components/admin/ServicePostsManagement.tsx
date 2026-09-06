@@ -15,13 +15,16 @@ import {
   Building2, 
   Users, 
   Shield, 
+  ShieldAlert,
+  ShieldCheck,
   Trash2, 
   Edit2, 
   X, 
   Save, 
   UserCheck, 
   MapPin, 
-  AlertCircle 
+  AlertCircle,
+  Crosshair
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ServicePost } from '../../types';
@@ -37,6 +40,26 @@ export default function ServicePostsManagement() {
   const [postName, setPostName] = useState('');
   const [companyName, setCompanyName] = useState('');
   
+  // Modalidade Armada / Desarmada
+  const [isArmed, setIsArmed] = useState(false);
+
+  // Dados da Arma (somente quando posto armado)
+  const [weaponTipo, setWeaponTipo] = useState('Revólver .38');
+  const [weaponMarca, setWeaponMarca] = useState('Taurus');
+  const [weaponCalibre, setWeaponCalibre] = useState('.38');
+  const [weaponNumeroSerie, setWeaponNumeroSerie] = useState('');
+  const [weaponQuantidadeMunicao, setWeaponQuantidadeMunicao] = useState<number | string>('12');
+  const [weaponRegistroSinarm, setWeaponRegistroSinarm] = useState('');
+  const [weaponObservacoes, setWeaponObservacoes] = useState('');
+
+  // Dados do Colete Balístico (somente quando posto armado)
+  const [vestNumeroSerie, setVestNumeroSerie] = useState('');
+  const [vestMarca, setVestMarca] = useState('Inbra Terrestre');
+  const [vestNivelProtecao, setVestNivelProtecao] = useState('Nível III-A');
+  const [vestTamanho, setVestTamanho] = useState('G');
+  const [vestValidade, setVestValidade] = useState('');
+  const [vestObservacoes, setVestObservacoes] = useState('');
+
   // Tag input states
   const [colaboradorInput, setColaboradorInput] = useState('');
   const [colaboradoresList, setColaboradoresList] = useState<string[]>([]);
@@ -67,6 +90,20 @@ export default function ServicePostsManagement() {
     setEditingPost(null);
     setPostName('');
     setCompanyName('');
+    setIsArmed(false);
+    setWeaponTipo('Revólver .38');
+    setWeaponMarca('Taurus');
+    setWeaponCalibre('.38');
+    setWeaponNumeroSerie('');
+    setWeaponQuantidadeMunicao('12');
+    setWeaponRegistroSinarm('');
+    setWeaponObservacoes('');
+    setVestNumeroSerie('');
+    setVestMarca('Inbra Terrestre');
+    setVestNivelProtecao('Nível III-A');
+    setVestTamanho('G');
+    setVestValidade('');
+    setVestObservacoes('');
     setColaboradoresList([]);
     setVigilantesList([]);
     setColaboradorInput('');
@@ -78,6 +115,20 @@ export default function ServicePostsManagement() {
     setEditingPost(post);
     setPostName(post.name);
     setCompanyName(post.companyName || '');
+    setIsArmed(Boolean(post.isArmed));
+    setWeaponTipo(post.weaponDetails?.tipo || 'Revólver .38');
+    setWeaponMarca(post.weaponDetails?.marca || 'Taurus');
+    setWeaponCalibre(post.weaponDetails?.calibre || '.38');
+    setWeaponNumeroSerie(post.weaponDetails?.numeroSerie || '');
+    setWeaponQuantidadeMunicao(post.weaponDetails?.quantidadeMunicao ?? '12');
+    setWeaponRegistroSinarm(post.weaponDetails?.registroSinarm || '');
+    setWeaponObservacoes(post.weaponDetails?.observacoes || '');
+    setVestNumeroSerie(post.vestDetails?.numeroSerie || '');
+    setVestMarca(post.vestDetails?.marca || 'Inbra Terrestre');
+    setVestNivelProtecao(post.vestDetails?.nivelProtecao || 'Nível III-A');
+    setVestTamanho(post.vestDetails?.tamanho || 'G');
+    setVestValidade(post.vestDetails?.validade || '');
+    setVestObservacoes(post.vestDetails?.observacoes || '');
     setColaboradoresList(post.colaboradores || []);
     setVigilantesList(post.vigilantes || []);
     setColaboradorInput('');
@@ -114,13 +165,48 @@ export default function ServicePostsManagement() {
       return;
     }
 
-    const postData = {
+    if (isArmed) {
+      if (!weaponNumeroSerie.trim()) {
+        alert("Para postos armados, o número de série da arma é obrigatório.");
+        return;
+      }
+      if (!vestNumeroSerie.trim()) {
+        alert("Para postos armados, o número de série do colete balístico é obrigatório.");
+        return;
+      }
+    }
+
+    const postData: any = {
       name: postName.trim(),
       companyName: companyName.trim(),
+      isArmed: Boolean(isArmed),
       colaboradores: colaboradoresList,
       vigilantes: vigilantesList,
       createdAt: editingPost ? editingPost.createdAt : serverTimestamp()
     };
+
+    if (isArmed) {
+      postData.weaponDetails = {
+        tipo: weaponTipo,
+        marca: weaponMarca.trim(),
+        calibre: weaponCalibre.trim(),
+        numeroSerie: weaponNumeroSerie.trim().toUpperCase(),
+        quantidadeMunicao: weaponQuantidadeMunicao === '' ? 0 : Number(weaponQuantidadeMunicao),
+        registroSinarm: weaponRegistroSinarm.trim(),
+        observacoes: weaponObservacoes.trim()
+      };
+      postData.vestDetails = {
+        numeroSerie: vestNumeroSerie.trim().toUpperCase(),
+        marca: vestMarca.trim(),
+        nivelProtecao: vestNivelProtecao,
+        tamanho: vestTamanho,
+        validade: vestValidade,
+        observacoes: vestObservacoes.trim()
+      };
+    } else {
+      postData.weaponDetails = null;
+      postData.vestDetails = null;
+    }
 
     try {
       if (editingPost) {
@@ -149,9 +235,12 @@ export default function ServicePostsManagement() {
   // Filter posts
   const filteredPosts = posts.filter(post => 
     post.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    post.colaboradores.some(c => c.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    post.vigilantes.some(v => v.toLowerCase().includes(searchTerm.toLowerCase()))
+    (post.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (post.isArmed ? 'armado' : 'desarmado').includes(searchTerm.toLowerCase()) ||
+    (post.weaponDetails?.numeroSerie || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (post.vestDetails?.numeroSerie || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (post.colaboradores || []).some(c => c.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (post.vigilantes || []).some(v => v.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -212,21 +301,36 @@ export default function ServicePostsManagement() {
             >
               {/* Card Header */}
               <div className="bg-slate-900 text-white p-4 flex justify-between items-start">
-                <div className="flex items-center gap-2 overflow-hidden mr-2">
-                  <MapPin className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span className="font-extrabold uppercase tracking-tight text-sm truncate">{post.name}</span>
+                <div className="flex-1 overflow-hidden mr-2">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span className="font-extrabold uppercase tracking-tight text-sm truncate">{post.name}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    {post.isArmed ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        <Crosshair className="w-3 h-3 text-rose-400" />
+                        Posto Armado
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        Posto Desarmado
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleOpenEditModal(post)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Editar Posto"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDeletePost(post.id)}
-                    className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-slate-800 transition-colors"
+                    className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Excluir Posto"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -246,6 +350,49 @@ export default function ServicePostsManagement() {
                     {post.companyName || "Não informada"}
                   </p>
                 </div>
+
+                {/* Exibição de Arma e Colete quando for Posto Armado */}
+                {post.isArmed && (
+                  <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-rose-900 tracking-wider flex items-center gap-1.5">
+                        <Crosshair className="w-3.5 h-3.5 text-rose-600" />
+                        Armamento e Colete do Posto
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-md">
+                        Cautelados
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="bg-white p-2.5 rounded-lg border border-rose-100 shadow-2xs">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Arma Cadastrada</span>
+                        <p className="font-extrabold text-slate-900 truncate mt-0.5">
+                          {post.weaponDetails?.tipo || 'Arma Cadastrada'}
+                        </p>
+                        <p className="text-[10px] font-mono text-rose-700 font-bold mt-0.5 truncate">
+                          Série: {post.weaponDetails?.numeroSerie || 'N/I'}
+                        </p>
+                        <p className="text-[10px] text-slate-600 mt-0.5">
+                          {post.weaponDetails?.quantidadeMunicao !== undefined ? `${post.weaponDetails.quantidadeMunicao} mun.` : ''} {post.weaponDetails?.marca ? `• ${post.weaponDetails.marca}` : ''} {post.weaponDetails?.calibre ? `(${post.weaponDetails.calibre})` : ''}
+                        </p>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-rose-100 shadow-2xs">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Colete Balístico</span>
+                        <p className="font-extrabold text-slate-900 truncate mt-0.5">
+                          {post.vestDetails?.nivelProtecao || 'Nível III-A'} {post.vestDetails?.tamanho ? `(${post.vestDetails.tamanho})` : ''}
+                        </p>
+                        <p className="text-[10px] font-mono text-indigo-900 font-bold mt-0.5 truncate">
+                          Série: {post.vestDetails?.numeroSerie || 'N/I'}
+                        </p>
+                        <p className="text-[10px] text-slate-600 mt-0.5 truncate">
+                          {post.vestDetails?.marca ? `${post.vestDetails.marca}` : 'Colete balístico'} {post.vestDetails?.validade ? `• Val: ${post.vestDetails.validade.split('-').reverse().join('/')}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Colaboradores */}
                 <div className="space-y-1">
@@ -361,6 +508,300 @@ export default function ServicePostsManagement() {
                     </div>
                   </div>
                 </div>
+
+                {/* Modalidade do Posto: Desarmado vs Armado */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Shield className="w-4 h-4 text-indigo-600" />
+                        Modalidade do Posto
+                      </h4>
+                      <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                        Defina se o posto opera com arma de fogo e colete balístico.
+                      </p>
+                    </div>
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                      isArmed 
+                        ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                        : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    }`}>
+                      {isArmed ? 'Posto Armado' : 'Posto Desarmado'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsArmed(false)}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                        !isArmed 
+                          ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm' 
+                          : 'bg-white border-slate-200 hover:bg-slate-100 opacity-70'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${!isArmed ? 'bg-emerald-600 text-white' : 'bg-slate-150 text-slate-500'}`}>
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-900">Posto Desarmado</p>
+                        <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                          Vigilância desarmada, controle de portaria ou recepção.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsArmed(true)}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                        isArmed 
+                          ? 'bg-rose-50/90 border-rose-500 ring-2 ring-rose-500/20 shadow-sm' 
+                          : 'bg-white border-slate-200 hover:bg-slate-100 opacity-70'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${isArmed ? 'bg-rose-600 text-white' : 'bg-slate-150 text-slate-500'}`}>
+                        <Crosshair className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wider text-slate-900">Posto Armado</p>
+                        <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                          Exige cadastramento obrigatório de arma e colete balístico.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* SOMENTE QUANDO FOR POSTO ARMADO: Cadastrar Arma e Colete Balístico */}
+                <AnimatePresence>
+                  {isArmed && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-4 overflow-hidden"
+                    >
+                      {/* 1. Armamento da Carga do Posto */}
+                      <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-200 space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-rose-200/70">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center text-xs font-black">
+                              1
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-black uppercase tracking-wider text-rose-950 flex items-center gap-1.5">
+                                <Crosshair className="w-4 h-4 text-rose-600" />
+                                Cadastrar Arma de Fogo
+                              </h4>
+                              <p className="text-[10px] text-rose-700 font-medium">
+                                Dados da arma de fogo alocada permanentemente neste posto.
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase bg-rose-200 text-rose-900 px-2 py-0.5 rounded-md">
+                            Obrigatório
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Tipo de Arma *</label>
+                            <select
+                              value={weaponTipo}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setWeaponTipo(val);
+                                if (val === 'Revólver .38') setWeaponCalibre('.38');
+                                else if (val === 'Pistola .380') setWeaponCalibre('.380 ACP');
+                                else if (val === 'Pistola 9mm') setWeaponCalibre('9mm');
+                                else if (val === 'Pistola .40') setWeaponCalibre('.40 S&W');
+                                else if (val === 'Espingarda Cal. 12') setWeaponCalibre('12');
+                                else if (val === 'Carabina .38') setWeaponCalibre('.38');
+                              }}
+                              className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            >
+                              <option value="Revólver .38">Revólver .38</option>
+                              <option value="Pistola .380">Pistola .380</option>
+                              <option value="Pistola 9mm">Pistola 9mm</option>
+                              <option value="Pistola .40">Pistola .40</option>
+                              <option value="Espingarda Cal. 12">Espingarda Cal. 12</option>
+                              <option value="Carabina .38">Carabina .38</option>
+                              <option value="Outro">Outro Armamento</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Marca / Fabricante</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Taurus, CBC, Glock"
+                              value={weaponMarca}
+                              onChange={(e) => setWeaponMarca(e.target.value)}
+                              className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Calibre</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: .38, .380, 9mm"
+                              value={weaponCalibre}
+                              onChange={(e) => setWeaponCalibre(e.target.value)}
+                              className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-rose-950">Número de Série da Arma *</label>
+                            <input
+                              type="text"
+                              required={isArmed}
+                              placeholder="Ex: ABC123456"
+                              value={weaponNumeroSerie}
+                              onChange={(e) => setWeaponNumeroSerie(e.target.value.toUpperCase())}
+                              className="px-3 py-2 border border-rose-300 rounded-xl text-xs bg-white font-mono font-bold text-rose-950 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 uppercase"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Qtd. de Munições *</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required={isArmed}
+                              placeholder="Ex: 12"
+                              value={weaponQuantidadeMunicao}
+                              onChange={(e) => setWeaponQuantidadeMunicao(e.target.value)}
+                              className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-bold text-slate-800 text-center focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Registro SINARM / PF (Opcional)</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: SINARM 123456"
+                              value={weaponRegistroSinarm}
+                              onChange={(e) => setWeaponRegistroSinarm(e.target.value)}
+                              className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1 pt-1">
+                          <label className="text-[11px] font-bold text-slate-700">Observações do Armamento (Opcional)</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Armário cofre do posto, coldre saque rápido, 2 carregadores"
+                            value={weaponObservacoes}
+                            onChange={(e) => setWeaponObservacoes(e.target.value)}
+                            className="px-3 py-2 border border-rose-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 2. Colete Balístico do Posto */}
+                      <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-200 space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-indigo-200/70">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-black">
+                              2
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-black uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                                <ShieldAlert className="w-4 h-4 text-indigo-600" />
+                                Cadastrar Colete Balístico
+                              </h4>
+                              <p className="text-[10px] text-indigo-700 font-medium">
+                                Especificação do colete balístico de proteção individual da guarnição.
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase bg-indigo-200 text-indigo-900 px-2 py-0.5 rounded-md">
+                            Obrigatório
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-indigo-950">Nº Série / Lacre do Colete *</label>
+                            <input
+                              type="text"
+                              required={isArmed}
+                              placeholder="Ex: COL-987654"
+                              value={vestNumeroSerie}
+                              onChange={(e) => setVestNumeroSerie(e.target.value.toUpperCase())}
+                              className="px-3 py-2 border border-indigo-300 rounded-xl text-xs bg-white font-mono font-bold text-indigo-950 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 uppercase"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Fabricante / Marca</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Inbra Terrestre, Glágio, CBC"
+                              value={vestMarca}
+                              onChange={(e) => setVestMarca(e.target.value)}
+                              className="px-3 py-2 border border-indigo-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Nível de Proteção</label>
+                            <select
+                              value={vestNivelProtecao}
+                              onChange={(e) => setVestNivelProtecao(e.target.value)}
+                              className="px-3 py-2 border border-indigo-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            >
+                              <option value="Nível III-A">Nível III-A</option>
+                              <option value="Nível II">Nível II</option>
+                              <option value="Nível II-A">Nível II-A</option>
+                              <option value="Nível I">Nível I</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Tamanho da Capa</label>
+                            <select
+                              value={vestTamanho}
+                              onChange={(e) => setVestTamanho(e.target.value)}
+                              className="px-3 py-2 border border-indigo-200 rounded-xl text-xs bg-white font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            >
+                              <option value="P">Tamanho P</option>
+                              <option value="M">Tamanho M</option>
+                              <option value="G">Tamanho G</option>
+                              <option value="GG">Tamanho GG</option>
+                              <option value="XG">Tamanho XG</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Data de Validade do Painel</label>
+                            <input
+                              type="date"
+                              value={vestValidade}
+                              onChange={(e) => setVestValidade(e.target.value)}
+                              className="px-3 py-2 border border-indigo-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Observações do Colete (Opcional)</label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Capa tática preta, zíper revisado"
+                              value={vestObservacoes}
+                              onChange={(e) => setVestObservacoes(e.target.value)}
+                              className="px-3 py-2 border border-indigo-200 rounded-xl text-xs bg-white font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Colaboradores Tag input */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
